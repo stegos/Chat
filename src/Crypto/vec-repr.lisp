@@ -482,7 +482,8 @@ THE SOFTWARE.
   (declare (integer val))
   (let ((nc  (* 2 (length vec))))
     (declare (fixnum nc))
-    (format nil "~@?" (format nil "~~~A,'0x" nc) val)))
+    (with-standard-io-syntax
+      (format nil "~@?" (format nil "~~~A,'0x" nc) val))))
 
 (defmethod hex ((x bev))
   (make-instance 'hex

@@ -53,6 +53,11 @@ THE SOFTWARE.
    :mchi
    :quadratic-residue-p
    :m!
+
+   :mmax
+   :mmin
+   :bezout
+   :msigned
    ))
 
 #|
@@ -271,6 +276,9 @@ THE SOFTWARE.
    :ed-vrf
    :ed-prove-vrf
    :ed-check-vrf
+
+   :modr
+   :modq
    ))
 
 (defpackage :lagrange-4-square
@@ -468,11 +476,13 @@ THE SOFTWARE.
    :m=
    :m^
    :msqrt
+   :msqr
    :m+
    :m-
    :m*
    :m/
    :minv
+   :bezout
    :mmod
    :mchi
    :quadratic-residue-p

@@ -33,6 +33,9 @@
    :vec-repr
    :hash)
   (:import-from :edwards-ecc
+   :ecc-pt
+   :ecc-pt-x
+   :ecc-pt-y
    :ed-mul
    :ed-add
    :ed-sub

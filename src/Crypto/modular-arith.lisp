@@ -127,13 +127,13 @@ THE SOFTWARE.
   (1- *m*))
 
 (defun m/2l ()
-  (truncate (m-1) 2))
+  (ash (m-1) -1))
 
 (defun m+1 ()
   (1+ *m*))
 
 (defun m/2u ()
-  (truncate (m+1) 2))
+  (ash (m+1) -1))
 
 (defun m! (m)
   ;; for REPL convenience, so we don't have to keep doing WITH-MOD
@@ -260,16 +260,22 @@ THE SOFTWARE.
   ;; base^exponent mod modulus, for any modulus
   ;; use a 4-bit fixed window algorithm
   (declare (integer base exp))
-  (let ((x (mmod base)))
-    (declare (integer x))
-    (if (< x 2)  ;; x = 0,1
-        x
-      ;; else
+  (multiple-value-bind (x exp)
+      (if (minusp exp)
+          (values (minv base) (- exp))
+        (values (mmod base) exp))
+    (declare (integer x exp))
+    (cond
+     ((< x 2)     x) ;; x = 0,1
+     ((zerop exp) 1)
+     ((= 1 exp)   x)
+     ((= 2 exp)   (msqr x))
+     (t 
       (generalized-windowed-exponentiation x exp
                                            :window-nbits 4
                                            :op-mul       'm*
                                            :op-sqr       'msqr))
-    ))
+     )))
 
 ;; ------------------------------------------------------------
 
@@ -297,6 +303,28 @@ THE SOFTWARE.
       (m* arg (minv (apply 'm* args)))
     (minv arg)))
 
+(defun bezout (a b)
+  ;; Extended Euclidean algorithm
+  ;; Bezout's identity: gcd(a,b) = s*a + t*b
+  (declare (integer a b))
+  (um:nlet-tail iter ((r0  a)
+                      (r1  b)
+                      (s0  1)
+                      (s1  0)
+                      (t0  0)
+                      (t1  1))
+    (declare (integer r0 r1 s0 s1 t0 t1))
+    (if (zerop r1)
+        (values r0  ;; gcd
+                s0  ;; gcd(a,b) = a*s + b*t
+                t0)
+      (multiple-value-bind (q r2) (truncate r0 r1)
+        (let* ((s2 (- s0 (* q s1)))
+               (t2 (- t0 (* q t1))))
+          (declare (integer q r2 s2 t2))
+          (iter r1 r2 s1 s2 t1 t2)))
+      )))
+        
 ;; ------------------------------------------------------------
 
 (defun mchi (x)
@@ -325,63 +353,68 @@ THE SOFTWARE.
   ;; Fq non-squares.
   ;;
   (declare (integer x))
-  (check-type x (integer 0)) ;; should be >= 0
-  (if (< x 2)
-      x
-    (multiple-value-bind (re im^2)
-        (um:nlet-tail iter ((a  2))
-          ;; look for quadratic nonresidue (the imaginary base)
-          ;; where we already know that x must be a quadratic residue
-          (declare (integer a))
-          (let ((v  (m- (m* a a) x)))
-            (declare (integer v))
-          (if (quadratic-residue-p v)
-              (iter (1+ a))
-            (values a v))
-          ))
-      (declare (integer re im^2))
-      (labels
-          ;; complex multiplication over the field Fq^2
-          ((fq2* (a b)
-             (destructuring-bind (are . aim) a
-               (declare (integer are aim))
-               (destructuring-bind (bre . bim) b
-                 (declare (integer bre bim))
+  (let ((x (mmod x)))
+    (declare (integer x))
+    (if (< x 2)
+        x
+      (multiple-value-bind (re im^2)
+          (um:nlet-tail iter ((a  2))
+            ;; look for quadratic nonresidue (the imaginary base)
+            ;; where we already know that x must be a quadratic residue
+            (declare (integer a))
+            (let ((v  (m- (m* a a) x)))
+              (declare (integer v))
+              (if (quadratic-residue-p v)
+                  (iter (1+ a))
+                (values a v))
+              ))
+        (declare (integer re im^2))
+        (labels
+            ;; complex multiplication over the field Fq^2
+            ((fq2* (a b)
+               (destructuring-bind (are . aim) a
+                 (declare (integer are aim))
+                 (destructuring-bind (bre . bim) b
+                   (declare (integer bre bim))
+                   (cons
+                    (m+ (m* are bre)
+                        (m* aim bim im^2))
+                    (m+ (m* are bim)
+                        (m* aim bre)))
+                   )))
+             
+             (fq2sqr (a)
+               (destructuring-bind (are . aim) a
+                 (declare (integer are aim))
                  (cons
-                  (m+ (m* are bre)
-                      (m* aim bim im^2))
-                  (m+ (m* are bim)
-                      (m* aim bre)))
-                 )))
-           
-           (fq2sqr (a)
-             (destructuring-bind (are . aim) a
-               (declare (integer are aim))
-               (cons
-                (m+ (m* are are)
-                    (m* aim aim im^2))
-                (m* 2 are aim)))))
-        
-        (car (generalized-windowed-exponentiation (cons re 1) (m/2u)
-                                                  :window-nbits  4
-                                                  :op-mul        #'fq2*
-                                                  :op-sqr        #'fq2sqr))
-        ))))
+                  (m+ (m* are are)
+                      (m* aim aim im^2))
+                  (m* 2 are aim)))))
+          
+          (car (generalized-windowed-exponentiation (cons re 1) (m/2u)
+                                                    :window-nbits  4
+                                                    :op-mul        #'fq2*
+                                                    :op-sqr        #'fq2sqr))
+          )))))
   
-(defun get-msqrt-fn (base)
-  (get-cached-symbol-data '*m* :msqrt base
-                          (lambda ()
-                            (cond
-                             ((= 3 (mod base 4))
-                              (let ((p (truncate (1+ base) 4)))
-                                (um:rcurry 'm^ p)))
-                             #|
-                             ((= 5 (mod base 8))
-                              (let ((p (truncate (+ base 3) 8)))
-                                  (um:rcurry 'm^ p)))
-                             |#
-                             (t 'fast-cipolla)))))
-
+(defun get-msqrt-fn ()
+  (get-cached-symbol-data '*m* :msqrt *m*
+                          (let ((base *m*))
+                            (declare (integer base))
+                            (lambda ()
+                              (cond
+                               ((= 3 (the fixnum (logand base 3)))
+                                (let ((p (ash (the integer (1+ base)) -2)))
+                                  (declare (integer p))
+                                  (lambda (x)
+                                    (declare (integer x))
+                                    (m^ x p))))
+                                (t 'tonelli-shanks)
+                               ;; (t 'fast-cipolla)
+                               ))
+                            )))
+  
+#|
 (defun msqrt (x)
   ;; assumes m is prime
   ;; a^(m-1) = 1 for m prime
@@ -407,7 +440,142 @@ THE SOFTWARE.
             (t (error "not a square"))
             ))
     ))
+|#
 
+(defun msqrt (x)
+  (declare (integer x))
+  (let* ((x   (mmod x))
+         (xrt (funcall (get-msqrt-fn) x)))
+    (declare (integer x xrt))
+    (if (= x (msqr xrt))
+      xrt
+      (error "Not a square residue"))))
+
+(defun msigned (x)
+  (let ((mx (m- x)))
+    (if (< x mx)
+        x
+      (- mx))))
+                
 ;; -----------------------------------------------------------
 
+(defun get-tonelli-shanks-params ()
+  (get-cached-symbol-data '*m* :tonelli *m*
+                          (let ((base *m*))
+                            (declare (integer base))
+                            (lambda ()
+                              (multiple-value-bind (q s)
+                                  (um:nlet-tail iter ((q  (1- base))
+                                                      (s  0))
+                                    (declare (integer q s))
+                                    (if (oddp q)
+                                        (values q s)
+                                      (iter (ash q -1)
+                                            (1+ s))))
+                                (declare (integer q s))
+                                (let ((z (um:nlet-tail iter ((x 2))
+                                           ;; on average, about 2 iters
+                                           (declare (integer x))
+                                           (if (quadratic-residue-p x)
+                                               (iter (1+ x))
+                                             x))))
+                                  (declare (integer z))
+                                  (list q s z)))))))
 
+(defun tonelli-shanks (x)
+  "Tonelli-Shanks algorithm for Sqrt in prime field"
+  (declare (integer x))
+  (let ((x (mmod x)))
+    (declare (integer x))
+    (if (< x 2)
+        x
+      (progn
+        #|
+        (unless (quadratic-residue-p x)
+          (error "Not a quadratic residue"))
+        |#
+        (destructuring-bind (q s z) (get-tonelli-shanks-params)
+          (declare (integer q s z))
+          (um:nlet-tail iter ((m  s)
+                              (c  (m^ z q))
+                              (tt (m^ x q))
+                              (r  (m^ x (ash (1+ q) -1))))
+            (declare (integer m c tt r))
+            (cond ((zerop tt) 0)
+                  ((= tt 1)   r)
+                  (t
+                   (let* ((i  (um:nlet-tail iteri ((i  1)
+                                                   (x  (msqr tt)))
+                                (declare (integer i x))
+                                (cond ((= i m)  (error "Not a quadratic residue"))
+                                      ((= x 1)  i)
+                                      (t        (iteri (1+ i) (msqr x)))
+                                      )))
+                          (b  (m^ c (ash 1 (- m i 1))))
+                          (new-m  i)
+                          (new-c  (msqr b))
+                          (new-tt (m* tt new-c))
+                          (new-r  (m* r b)))
+                     (declare (integer i b new-m new-c new-tt new-r))
+                     (iter new-m new-c new-tt new-r)))
+                  ))
+          )))))
+
+#|
+  ;; looks like Tonelli-Shanks is the speed winner here, by more than 2:1
+  ;; cacheing of precomputed parameters is important, as is the removal of the
+  ;; test for quadratic residue, which is detected later.
+  
+(with-mod 904625697166532776746648320380374280092339035279495474023489261773642975601
+  (assert (/= 3 (logand *m* 3))) ;; ensure (q mod 4 != 3)
+  (let* ((elts (loop repeat 1000 collect
+                    (um:nlet-tail iter ()
+                      (let ((x (core-crypto:random-between 1 *m*)))
+                        (if (quadratic-residue-p x)
+                            x
+                          (iter)))))))
+    (time (map nil 'fast-cipolla elts))
+    (time (map nil 'tonelli-shanks elts))))
+
+(unintern '*m*)
+ |#
+
+;; interesting...
+(defun msqrtx (x)
+  (let ((root (msqrt x)))
+    (min root (m- root))))
+
+(defun mmax (a b)
+  (m/ (m+ a b
+          (msqrtx (msqr (m- a b))))
+      2))
+
+(defun mmin (a b)
+  (m/ (m- (m+ a b)
+          (msqrtx (msqr (m- a b))))
+      2))
+
+(defun m>= (a b)
+  (= a (mmax a b)))
+
+(defun m< (a b)
+  (not (m>= a b)))
+
+#|
+(defun tst (a b)
+  (if (< a b)
+      (assert (m< a b))
+    (if (< b a)
+        (assert (m< b a)))))
+
+(with-mod 3618502788666131106986593281521497120414687020801267626233049500247285301239
+  (dotimes (ix 1000000)
+    (let ((x (core-crypto:random-between 0 *m*))
+          (y (core-crypto:random-between 0 *m*)))
+      (tst x y))))
+
+(with-mod 3618502788666131106986593281521497120414687020801267626233049500247285301239
+  (dotimes (x 1000000)
+    (tst x (+ x 123456))))
+
+|#

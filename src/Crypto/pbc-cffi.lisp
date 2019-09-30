@@ -1159,7 +1159,7 @@ Certification includes a BLS Signature on the public key."
                    (id     crypto-packet-id)
                    (tstamp crypto-packet-tstamp)
                    (rval   crypto-packet-rval)
-                   (cmsg   crypto-packet-cmsg)) cx
+                   (cmsg   crypto-packet-cmsg))
     (let ((skid (make-secret-subkey skey id))
           (pkey (make-public-subkey pkey id)))
       (with-fli-buffers ((pbuf  *gt-size*)

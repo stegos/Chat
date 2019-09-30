@@ -835,6 +835,49 @@ THE SOFTWARE.
          (,lister ',f '%sk ,@args))
        (defun ,f (%sk ,@parms) ,@body))))
 
+(defmacro =flet (bindings &body body)
+  (let* ((names  (mapcar 'first bindings))
+         (args   (mapcar 'second bindings)) 
+         (bodies (mapcar 'cddr bindings))
+         (fns    (mapcar (lambda (name)
+                           (symb '= name))
+                         names)))
+    `(flet ,(mapcar (lambda (fn args body)
+                      `(,fn (%sk ,@args) ,@body))
+                    fns args bodies)
+       (macrolet ,(mapcar (lambda (name args fn)
+                            (let ((lister (if (find '&rest args)
+                                              'list*
+                                            'list)))
+                              `(,name ,args (,lister ',fn '%sk ,@(remove '&rest args)))
+                              ))
+                          names args fns)
+         ,@body))))
+
+(defmacro =labels (bindings &body body)
+  (let* ((names  (mapcar 'first bindings))
+         (args   (mapcar 'second bindings)) 
+         (bodies (mapcar 'cddr bindings))
+         (fns    (mapcar (lambda (name)
+                           (symb '= name))
+                         names)))
+    `(macrolet ,(mapcar (lambda (name args fn)
+                          (let ((lister (if (find '&rest args)
+                                            'list*
+                                          'list)))
+                            `(,name ,args (,lister ',fn '%sk ,@(remove '&rest args)))
+                            ))
+                        names args fns)
+       (labels ,(mapcar (lambda (fn args body)
+                          `(,fn (%sk ,@args) ,@body))
+                        fns args bodies)
+         ,@body))))
+
+#+:LISPWORKS
+(editor:setup-indent "=flet" 1 nil nil 'flet)
+#+:LISPWORKS
+(editor:setup-indent "=labels" 1 nil nil 'flet)
+
 (defmacro =bind (parms expr &body body)
   ;;
   ;; (let ((f (=LAMBDA ()
@@ -878,9 +921,10 @@ THE SOFTWARE.
 
 (defmacro with-future ((ans) form &body body)
   ;; alternative for Actors and Processes alike
+  ;; form must provide result via =values, either immediately, or eventually
   `(=bind (,ans)
        (spawn (lambda ()
-                (=values ,form)))
+                ,form))
      ,@body))
 
 (define-symbol-macro =bind-callback %sk)
@@ -907,7 +951,7 @@ THE SOFTWARE.
 
 (defmethod do-aska (obj message cbfn)
   (with-future (ans)
-      (apply 'ask obj message)
+      (=values (apply 'ask obj message))
     (funcall cbfn ans)))
   
 ;; ------------------------------------------------
@@ -999,6 +1043,17 @@ THE SOFTWARE.
 #+:LISPWORKS
 (editor:setup-indent "with-futures" 2)
 
+(defmacro parlet (bindings &body body)
+  ;; each form must furnish result by =values
+  ;; either directly, or eventually
+  (let ((args  (mapcar 'first bindings))
+        (forms (mapcar 'second bindings)))
+    `(with-futures ,args ,forms ,@body)))
+
+#+:LISPWORKS
+(editor:setup-indent "parlet" 2)
+
+
 #|
 ;; examples...
   
@@ -1015,6 +1070,12 @@ THE SOFTWARE.
      (=values (sin 2))
      (=values (sin 3)))
   (pr (+ a b c)))
+=> 1.8918884
+
+(parlet ((a (=values (sin 1)))
+         (b (=values (sin 2)))
+         (c (=values (sin 3))))
+    (pr (+ a  b c)))
 => 1.8918884
 
 (=bind (lst)

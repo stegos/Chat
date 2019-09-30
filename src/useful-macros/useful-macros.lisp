@@ -1985,11 +1985,10 @@ This is C++ style enumerations."
                 (compose tst #'val-of)
                 #'1+)))
     
-    (cond ((zerop by)
-           (and (= from to) (list from)))
-          ((and (>= to from) (plusp by))
+    (cond ((and (> to from) (plusp by))
            (iota (rcurry #'>= #|ix|# to)))
           ((and (< to from) (minusp by))
+           (decf from)
            (iota (rcurry #'< #|ix|# to)))
           (t nil))))
 
@@ -3031,3 +3030,42 @@ or list acceptable to the reader macros #+ and #-."
   (declare (ignore a))
   b)
 
+;; --------------------------------------------------------------------------------
+
+(defmacro gathering (&body body)
+  "Run `body` to gather some things and return a fresh list of them.
+
+  `body` will be executed with the symbol `gather` bound to a
+  function of one argument.  Once `body` has finished, a list of
+  everything `gather` was called on will be returned.
+
+  It's handy for pulling results out of code that executes
+  procedurally and doesn't return anything, like `maphash` or
+  Alexandria's `map-permutations`.
+
+  The `gather` function can be passed to other functions, but should
+  not be retained once the `gathering` form has returned (it would
+  be useless to do so anyway).
+
+  Examples:
+
+    (gathering
+      (dotimes (i 5)
+        (gather i))
+    =>
+    (0 1 2 3 4)
+
+    (gathering
+      (mapc #'gather '(1 2 3))
+      (mapc #'gather '(a b)))
+    =>
+    (1 2 3 a b)
+
+  "
+  (let ((result (gensym)))
+    `(let ((,result nil))
+       (flet ((gather (item)
+                (push item ,result)
+                item))
+         ,@body)
+       (nreverse ,result))))

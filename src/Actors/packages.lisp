@@ -123,6 +123,8 @@ THE SOFTWARE.
 
    #:=lambda
    #:=defun
+   #:=flet
+   #:=labels
    #:=bind
    #:=bind-callback
    #:=values
@@ -136,6 +138,7 @@ THE SOFTWARE.
    #:pmapc
    #:par
    #:with-futures
+   #:parlet
    #:pfirst
    #:par-first
    #:with-first-future

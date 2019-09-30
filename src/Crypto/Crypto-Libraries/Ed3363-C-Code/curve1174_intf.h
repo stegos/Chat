@@ -53,6 +53,9 @@ extern "C" {
   void Curve1174_to_affine(unsigned char* lpx,
 			   unsigned char* lpy,
 			   unsigned char* lpz);
+
+  bool g1173_sqrt(unsigned char* lpsrc, 
+                  unsigned char* lpdst);
 }
 
 #endif // __curve1174_intf_h__

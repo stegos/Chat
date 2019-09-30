@@ -64,7 +64,7 @@ THE SOFTWARE.
 ;; curve has order 4 * *ed-r* for field arithmetic over prime field *ed-q*
 ;;    (ed-mul *ed-gen* (* 4 *ed-r*)) -> (0, *ed-c*)
 ;;
-;; isomorphs for d = d' * c'^4 then with (x,y) -> (x',y') = (c'*x, c'*y)
+;; isomorphs for d' = d / c'^4 then with (x,y) -> (x',y') = (c'*x, c'*y)
 ;;  x^2 + y^2 = 1 + d*x^2*y^2 -> x'^2 + y'^2 = c'^2*(1 + d'*x'^2*y'^2)
 ;;
 ;; See paper: "Elligator: Elliptic-curve points indistinguishable from uniform random strings"
@@ -96,6 +96,9 @@ THE SOFTWARE.
 
 (defmethod make-load-form ((point ecc-proj-pt) &optional env)
   (make-load-form-saving-slots point :environment env))
+
+(defmethod vec-repr:int ((pt ecc-pt))
+  (ed-compress-pt pt))
 
 ;; ------------------------------------------------------------------------------
 ;; Curve parameters from SafeCurves
@@ -345,12 +348,20 @@ THE SOFTWARE.
                              :y *ed-c*))))
 
 (defun ed-neutral-point-p (pt)
-  (zerop (ecc-pt-x pt)))
+  (ed-pt= pt (ed-neutral-point)))
 
 ;; -------------------------------------------------------------------
 
 (defun have-fast-impl ()
   (fast-ed-curve-p *edcurve*))
+
+;; -------------------------------------------------------------------
+
+(defmacro modq (form)
+  `(with-mod *ed-q* ,form))
+
+(defmacro modr (form)
+  `(with-mod *ed-r* ,form))
 
 ;; -------------------------------------------------------------------
 
@@ -433,8 +444,8 @@ THE SOFTWARE.
              (:struct-accessors ecc-pt ((x2 x) (y2 y)) pt2)
              (declare (integer x2 y2)))
     (with-mod *ed-q*
-      (and (m= x1 x2)
-           (m= y1 y2))
+      (and (= x1 x2)
+           (= y1 y2))
       )))
   
 (defmethod ed-pt= ((pt1 ecc-proj-pt) (pt2 ecc-pt))
@@ -443,8 +454,8 @@ THE SOFTWARE.
              (:struct-accessors ecc-pt ((x2 x) (y2 y)) pt2)
              (declare (integer x2 y2)))
     (with-mod *ed-q*
-      (and (m= (* z1 x2) x1)
-           (m= (* z1 y2) y1))
+      (and (= (m* z1 x2) x1)
+           (= (m* z1 y2) y1))
     )))
 
 (defmethod ed-pt= ((pt1 ecc-pt) (pt2 ecc-proj-pt))
@@ -456,8 +467,8 @@ THE SOFTWARE.
              (:struct-accessors ecc-pt ((x2 x) (y2 y) (z2 z)) pt2)
              (declare (integer x2 y2 z2)))
     (with-mod *ed-q*
-      (and (m= (* z1 x2) (* z2 x1))
-           (m= (* z1 y2) (* z2 y1)))
+      (and (= (m* z1 x2) (m* z2 x1))
+           (= (m* z1 y2) (m* z2 y1)))
       )))
 
 ;; -------------------------------------------------------------------
@@ -467,22 +478,26 @@ THE SOFTWARE.
              (declare (integer x y)))
     ;; x^2 + y^2 = c^2*(1 + d*x^2*y^2)
     (with-mod *ed-q*
-      (m= (+ (* x x)
-             (* y y))
-          (* *ed-c* *ed-c*
-             (1+ (m* *ed-d* x x y y)))
-          ))))
-
+      (let ((xx (m* x x))
+            (yy (m* y y)))
+        (= (m+ xx yy)
+           (m* *ed-c* *ed-c*
+               (m+ 1 (m* *ed-d* xx yy))))
+        ))))
+  
 (defmethod ed-satisfies-curve ((pt ecc-proj-pt))
   (um:bind* ((:struct-accessors ecc-pt ((x x) (y y) (z z)) pt)
              (declare (integer x y z)))
     ;; z^2*(x^2 + y^2) = c^2*(z^4 + d*x^2*y^2)
     (with-mod *ed-q*
-      (= (m* z z (+ (m* x x) (m* y y)))
-         (m* *ed-c* *ed-c*
-             (+ (m* z z z z)
-                (m* *ed-d* x x y y)))
-         ))))
+      (let ((xx (m* x x))
+            (yy (m* y y))
+            (zz (m* z z)))
+        (= (m* zz (m+ xx yy))
+           (m* *ed-c* *ed-c*
+               (+ (m* zz zz)
+                  (m* *ed-d* xx yy))))
+        ))))
 
 ;; -------------------------------------------------------------------
 
@@ -678,7 +693,14 @@ THE SOFTWARE.
     (when (eql *edcurve* *curve-ed3363*)
       (setf v (dpb (cffi:mem-aref cvec :uint64 4) (byte 64 256) v)
             v (dpb (cffi:mem-aref cvec :uint64 5) (byte 64 320) v)))
-    (mod v *ed-q*)))
+    #|
+      ;; libs now handle conversion properly - DM 03/19
+    (assert (and (<= 0 v)
+                 (< v *ed-q*)))
+    (mod v *ed-q*)
+    |#
+    v
+    ))
 
 (defmacro with-fli-buffers (buffers &body body)
   (if (endp buffers)
@@ -759,10 +781,16 @@ THE SOFTWARE.
     ))
 
 #|
-(loop repeat 100 do
-      (range-proofs:validate-range-proof
-       (range-proofs:make-range-proof 1234567890)))
- |#
+(let ((prf (range-proofs:make-range-proof 1234567890)))
+  (time   
+   (loop repeat 100 do
+       (range-proofs:validate-range-proof prf))))
+
+(time
+ (loop repeat 100 do
+       (range-proofs:validate-range-proof
+        (range-proofs:make-range-proof 1234567890))))
+|#
 ;; -------------------------------------------------------------------
 ;; 4-bit fixed window method - decent performance, and never more than
 ;; |r|/4 terms
@@ -986,6 +1014,31 @@ THE SOFTWARE.
                           (lambda ()
                             (ceiling (ed-compressed-nbits) 8))))
 
+(defun ed-cmpr/h-sf ()
+  (get-cached-symbol-data '*edcurve*
+                          :ed-cmpr/h-sf *edcurve*
+                          (lambda ()
+                            (with-mod *ed-r*
+                              (m/ *ed-h*)))))
+
+(defun ed-decmpr*h-fn ()
+  (get-cached-symbol-data '*edcurve*
+                          :ed-decmpr*h-fn *edcurve*
+                          (lambda ()
+                            (case *ed-h*
+                              (1  'identity)
+                              (2  (lambda (pt)
+                                    (ed-add pt pt)))
+                              (4  (lambda (pt)
+                                    (let ((pt2 (ed-add pt pt)))
+                                      (ed-add pt2 pt2))))
+                              (8  (lambda (pt)
+                                    (let* ((pt2 (ed-add pt pt))
+                                           (pt4 (ed-add pt2 pt2)))
+                                      (ed-add pt4 pt4))))
+                              (t (error "No decompression function"))
+                              ))))
+
 (defun ed-compress-pt (pt &key lev) ;; lev = little-endian vector
   ;;
   ;; Standard encoding for EdDSA is X in little-endian notation, with
@@ -994,11 +1047,11 @@ THE SOFTWARE.
   ;; If lev is true, then a little-endian UB8 vector is produced,
   ;; else an integer value.
   ;;
-  (um:bind* ((:struct-accessors ecc-pt (x y) (ed-affine pt)))
-    (let ((enc
-           (if (oddp y)
-               (dpb 1 (byte 1 (ed-nbits)) x)
-             x)))
+  (um:bind* ((cmpr/h  (ed-cmpr/h-sf))
+             (:struct-accessors ecc-pt (x y)
+              (ed-affine (ed-mul pt cmpr/h))))
+    (let ((enc  (dpb (ldb (byte 1 0) y)
+                     (byte 1 (ed-nbits)) x)))
       (if lev
           (let ((enc (levn enc (ed-compressed-nbytes))))
             (if (eq lev :base58)
@@ -1011,37 +1064,49 @@ THE SOFTWARE.
 
 (defmethod ed-decompress-pt ((v integer))
   (with-mod *ed-q*
-    (let* ((nbits (ed-nbits))
-           (sgn   (ldb (byte 1 nbits) v))
-           (x     (dpb 0 (byte 1 nbits) v))
-           (yy    (m/ (m* (+ *ed-c* x)
-                          (- *ed-c* x))
-                      (- 1 (m* x x *ed-c* *ed-c* *ed-d*))))
-           (y     (msqrt yy))
-           (y     (if (eql sgn (ldb (byte 1 0) y))
-                      y
-                    (m- y))))
-      (assert (m= yy (* y y))) ;; check that yy was a square
-      ;; if yy was not a square then y^2 will equal -yy, not yy.
-      (ed-validate-point
-       (make-ecc-proj-pt
-        :x  x
-        :y  y
-        :z  1))
+    (let* ((decmpr-fn (ed-decmpr*h-fn))
+           (nbits (ed-nbits))
+           (sign  (ldb (byte 1 nbits) v))
+           (x     (ldb (byte nbits 0) v))
+           (y     (ed-solve-y x)))
+      (unless (= sign (ldb (byte 1 0) y))
+        (setf y (m- y)))
+      (funcall decmpr-fn
+               (make-ecc-proj-pt
+                :x  x
+                :y  y
+                :z  1))
       )))
+
+(defun ed-solve-y (x)
+  (with-mod *ed-q*
+    (msqrt (m/ (m* (+ *ed-c* x)
+                   (- *ed-c* x))
+               (- 1 (m* x x *ed-c* *ed-c* *ed-d*))))))
 
 ;; -----------------------------------------------------------------
 
 (defun ed-valid-point-p (pt)
-  (and (not (ed-neutral-point-p pt))
-       (ed-satisfies-curve pt)
-       (not (ed-neutral-point-p (ed-mul pt *ed-h*)))
+  (and (ed-satisfies-curve pt)
+       (not (or (zerop (ecc-pt-x pt))
+                (zerop (ecc-pt-y pt))))
        pt))
 
 (defun ed-validate-point (pt)
   (assert (ed-valid-point-p pt))
   pt)
 
+#|
+(loop repeat 10000 do
+      (let* ((pt (ed-random-generator)))
+        (ed-validate-point pt)))
+
+(loop repeat 10000 do
+      (let* ((n (random-between 1 *ed-r*))
+             (pt (ed-nth-pt n)))
+        (ed-validate-point pt)
+        (ed-validate-point (ed-mul pt (- n)))))
+ |#
 ;; -----------------------------------------------------------------
 
 (defmethod hashable ((x ecc-pt))
@@ -1069,11 +1134,16 @@ THE SOFTWARE.
                  (hash-to-grp-range
                   seed :generate-private-key index)))
          (s     (dpb 1 (byte 1 (1- nbits)) h))   ;; set high bit
-         (skey  (- s (logand s (1- *ed-h*)))))   ;; *ed-h* is always 2^n = (1, 4, 8, ...)
+         (skey  s)) ;; (- s (logand s (1- *ed-h*)))))   ;; *ed-h* is always 2^n = (1, 4, 8, ...)
     (if (< skey *ed-r*) ;; will be true with overwhelming probability (failure ~1e-38)
         skey
       (compute-deterministic-skey seed (1+ index)))
     ))
+
+(defun make-deterministic-keys (seed)
+  (let* ((skey  (compute-deterministic-skey seed))
+         (pkey  (ed-mul *ed-gen* skey)))
+    (values skey pkey)))
 
 (defun ed-random-pair ()
   "Select a random private and public key from the curve, abiding by
@@ -1108,39 +1178,35 @@ THE SOFTWARE.
       hint)))
 
 (defun ed-pt-from-hash (h)
-  "Hash onto curve. Treat h as X coord with sign indication,
-just like a compressed point. Then if Y is a quadratic residue
-we are done. Else re-probe with (X^2 + 1)."
-  (with-mod *ed-q*
-    (um:nlet-tail iter ((x (absorb-hash h)))
-      (let ((yy (m/ (m* (+ *ed-c* x)
-                        (- *ed-c* x))
-                    (m* (- 1 (m* x x *ed-c* *ed-c* *ed-d*))))
-                ))
+  "Hash onto curve. Treat h as X coord, just like a compressed point.
+Then if Y is a quadratic residue we are done.
+Else re-probe with (X^2 + 1)."
+  (let ((cof-fn  (ed-decmpr*h-fn)))
+    (with-mod *ed-q*
+      (um:nlet-tail iter ((x (absorb-hash h)))
         (or
-         (and (quadratic-residue-p yy)
-              (let* ((yysqrt  (msqrt yy))
-                     (y       (min yysqrt (m- yysqrt))))
-                (let ((pt (ed-mul (make-ecc-pt
-                                   :x x
-                                   :y y)
-                                  *ed-h*)))
-                  ;; Watch out! This multiply by cofactor is necessary
-                  ;; to prevent winding up in a small subgroup.
-                  ;;
-                  ;; we already know the point sits on the curve, but
-                  ;; it could now be the neutral point if initial
-                  ;; (x,y) coords were in a small subgroup.
-                  (and (not (ed-neutral-point-p pt))
-                       pt))))
+         (um:when-let (y (ignore-errors (ed-solve-y x)))
+           (let ((pt (funcall cof-fn
+                              (make-ecc-pt
+                               :x x
+                               :y y))))
+             ;; Watch out! This multiply by cofactor is necessary
+             ;; to prevent winding up in a small subgroup.
+             ;;
+             ;; we already know the point sits on the curve, but
+             ;; it could now be the neutral point if initial
+             ;; (x,y) coords were in a small subgroup.
+             (and (not (ed-neutral-point-p pt))
+                  pt)))
          ;; else - invalid point, so re-probe at x^2+1
          (iter (1+ (m* x x)))
          )))))
 
+
 (defun ed-pt-from-seed (&rest seeds)
   (ed-pt-from-hash (apply 'hash-to-pt-range seeds)))
 
-(defun ed-random-generator ()
+(defun ed-random-genrator ()
   (ed-pt-from-seed (uuid:make-v1-uuid)
                    (ctr-drbg (integer-length *ed-q*))))
 

@@ -378,6 +378,135 @@ void ginv(type64 *x)
 	gmul(x5,w,x);   // x = x^(2^251-11)
 }
 
+static
+void gneg(type64 *x, type64 *y) {
+  y[0] = -x[0];
+  y[1] = -x[1];
+  y[2] = -x[2];
+  y[3] = -x[3];
+  y[4] = -x[4];
+}
+   
+static
+void gnorm(type64 *x, type64 *y) {
+  type64 tmp[5];
+  gneg(x, tmp);
+  scr(tmp);
+  gneg(tmp, y);
+  scr(y);
+  scr(y);
+}
+
+static
+bool geq(type64 *x, type64 *y) {
+  // compare x, y for equality
+  type64 z1[5], z2[5];
+  gsub(x, y, z1);
+  gnorm(z1, z2);
+  return (z2[0] == 0
+    && z2[1] == 0
+    && z2[2] == 0
+    && z2[3] == 0
+    && z2[4] == 0);
+}
+
+static
+bool gsqrt(type64 *x, type64 *y) {
+  // Sqrt(x) -> y
+  //
+  // By Fermat's theorem, for prime |Fq|, |Fq| mod 4 = 3
+  // when X is a quadratic residue in the field,
+  // we have Sqrt(X) = X^((|Fq|+1)/4) mod |Fq|
+  // where (|Fq|+1)/4 = 0x1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE
+  // Return true if X was a quadratic-residue of Fq.
+
+  int i;
+  type64 tmp1[5], tmp2[5], ans[5];
+
+  // generate large run components
+  // bits_1 = x^(2^1-1) = x
+  type64 bits_2[5]; // = x^(2^2-1)
+  gsqr(x, tmp1);
+  gmul(x, tmp1, bits_2);
+
+  type64 bits_4[5];  // = x^(2^4-1)
+  gcopy(bits_2, tmp1);
+  gsqr(tmp1, tmp2);
+  gsqr(tmp2, tmp1);
+  gmul(bits_2, tmp1, bits_4);
+
+  type64 bits_8[5];  // = x^(2^8-1)
+  gcopy(bits_4, tmp1);
+  for(i = 0; i < 2; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_4, tmp1, bits_8);
+
+  type64 bits_16[5];  // = x^(2^16-1)
+  gcopy(bits_8, tmp1);
+  for(i = 0; i < 4; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_8, tmp1, bits_16);
+
+  type64 bits_32[5];  // = x^(2^32-1)
+  gcopy(bits_16, tmp1);
+  for(i = 0; i < 8; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_16, tmp1, bits_32);
+
+  type64 bits_64[5];  // = x^(2^64-1)
+  gcopy(bits_32, tmp1);
+  for(i = 0; i < 16; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_32, tmp1, bits_64);
+
+  type64 bits_128[5];  // = x^(2^128-1)
+  gcopy(bits_64, tmp1);
+  for(i = 0; i < 32; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_64, tmp1, bits_128);
+
+  // generate partial answer
+  // we need x^(2^248-1)
+  gcopy(bits_128, tmp1);
+  for(i = 0; i < 32; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_64, tmp1, ans);
+
+  gcopy(ans, tmp1);
+  for(i = 0; i < 16; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_32, tmp1, ans);
+
+  gcopy(ans, tmp1);
+  for(i = 0; i < 8; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_16, tmp1, ans);
+
+  gcopy(ans, tmp1);
+  for(i = 0; i < 4; ++i) {
+    gsqr(tmp1, tmp2);
+    gsqr(tmp2, tmp1); }
+  gmul(bits_8, tmp1, ans);
+
+  // generate small residue of exponent
+  gsqr(ans, tmp1);
+  gcopy(tmp1, ans);
+  // copy ans to output y
+  // and return true if y*y = x
+  gcopy(ans, y);
+  gsqr(y, tmp1);
+  return geq(tmp1, x);
+}
+
+
 // Point Structure
 
 typedef struct {
@@ -831,30 +960,23 @@ void gfetch(unsigned char* v, type64 *w)
 }
 
 static
-void scrn(type64 *w)
-{
-  do {
-    scr(w);
-  } while(w[0] & ~bot51bits);
-}
-
-static
 void gstore(type64 *w, unsigned char* v)
 {
   // store 51-bit words into consecutively stored 64-bit words in v.
   type64 *pv;
   uint64_t t1,t2;
+  type64 wn[5];
   
-  scrn(w);
-  t1 = w[0];
-  t2 = w[1];
+  gnorm(w, wn);
+  t1 = wn[0];
+  t2 = wn[1];
   pv = (type64*)v;
   pv[0] = t1 | (t2 << 51);
-  t1 = w[2];
+  t1 = wn[2];
   pv[1] = (t2 >> 13) | (t1 << 38);
-  t2 = w[3];
+  t2 = wn[3];
   pv[2] = (t1 >> 26) | (t2 << 25);
-  t1 = w[4];
+  t1 = wn[4];
   pv[3] = (t2 >> 39) | (t1 << 12);
 }
 
@@ -1032,6 +1154,17 @@ void Curve1174_to_affine(unsigned char* lpx,
   gmul(pz, py, t);
   gstore(t, lpy);
   gstore(pz, lpz); // in case anyone wants 1/z
+}
+
+extern "C"
+bool g1173_sqrt(unsigned char* lpsrc, unsigned char* lpdst)
+{
+   type64 src[5], dst[5];
+   
+   gfetch(lpsrc, src);
+   bool ans = gsqrt(src, dst);
+   gstore(dst, lpdst);
+   return ans;
 }
 
 // --- end of ed3363_intf.cpp --- //
