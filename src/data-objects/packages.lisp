@@ -54,6 +54,7 @@ THE SOFTWARE.
    #:fifo
    #:unsafe-priq
    #:priq
+   #:mailbox
    #:prio-mailbox
 
    #:make-unsafe-lifo
@@ -70,13 +71,17 @@ THE SOFTWARE.
    #:findq
    #:lastq
    #:countq
-   
+
+   #:make-mailbox
    #:make-prio-mailbox
    #:mailbox-send
    #:mailbox-read
    #:mailbox-peek
    #:mailbox-empty-p
    #:mailbox-not-empty-p
+   #:mailbox-discard
+   
+   #:locked-exec
    ))
 
 #|
@@ -416,6 +421,9 @@ THE SOFTWARE.
    #:height
    #:mem
    #:add
+   #:with-replacement
+   #:without-replacement
+   #:with-replacement-p
    #:remove
    #:remove-min-elt
    #:remove-max-elt
@@ -442,6 +450,7 @@ THE SOFTWARE.
    ;; privately exported for derivative packages
    #:with-node-bindings
    #:with-list-bindings
+   #:key-fn
    ))
 
 (defpackage #:maps
@@ -453,10 +462,12 @@ THE SOFTWARE.
    #:singleton
    #:is-empty
    #:mem
+   #:diff
    #:cardinal
    #:view-set
-   #:with-node-bindings)
-  (:shadowing-import-from #:sets #:equal #:remove)
+   #:with-node-bindings
+   #:key-fn)
+  (:shadowing-import-from #:sets #:equal #:remove #:union #:intersection)
   (:export
    #:map-cell-key
    #:map-cell-val
@@ -467,6 +478,9 @@ THE SOFTWARE.
    #:find
    #:remove
    #:mem
+   #:diff
+   #:intersection
+   #:union
    #:iter
    #:map
    #:mapi

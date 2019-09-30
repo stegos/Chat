@@ -1396,7 +1396,9 @@ lock it to the recipient."
   ;; let's compute the basis vectors just once, and share them
   (labels
       ;; ---------------------------------------------
-      ((make-range-proof (v &optional (gamma (rand-val)))
+      ((edx-compress-pt (pt)
+         pt)
+       (make-range-proof (v &optional (gamma (rand-val)))
          (check-type v     (integer 0))
          (check-type gamma (integer 1))
          (assert (<= 0 v (1- (ash 1 *nbits*))))
@@ -1485,12 +1487,45 @@ lock it to the recipient."
 ;; Range proof validation
 
 (defun internal-validate-range-proof (proof)
+  (labels ((xed-decompress-pt (pt)
+             (let ((pt (ed-decompress-pt pt)))
+               (let* ((pt/4 (ed-div pt 4))
+                      (xpt/4 (ed-add pt/4 (edec::make-ecc-pt :x 1 :y 0))))
+                 xpt/4
+                 pt
+                 
+                 #|
+                 (with-mod *ed-q*
+                   (setf (ecc-pt-y pt) (m- (ecc-pt-y pt))
+                         (ecc-pt-x pt) (m- (ecc-pt-x pt))))
+                 |#
+                 ;;pt
+                 ))))
+
   (let* ((nbits     *nbits*)
+
+         (vcmt      (xed-decompress-pt (range-proof-vcmt proof)))
+         (acmt      (xed-decompress-pt (range-proof-acmt proof)))
+         (scmt      (xed-decompress-pt (range-proof-scmt proof)))
+         (t1cmt     (xed-decompress-pt (range-proof-t1cmt proof)))
+         (t2cmt     (xed-decompress-pt (range-proof-t2cmt proof)))
+
+         (x         (int (hash/256 t1cmt t2cmt)))
+         (y         (int (hash-to-range *ed-r* vcmt acmt scmt)))
+         (z         (int (hash-to-range *ed-r* y)))
+
+         #|
          (y         (range-proof-y proof))
-         (yvec      (pow-vec y nbits))
          (z         (range-proof-z proof))
-         (zsq       (m* z z))
          (x         (range-proof-x proof))
+         (vcmt      (ed-decompress-pt (range-proof-vcmt proof)))
+         (t1cmt     (ed-decompress-pt (range-proof-t1cmt proof)))
+         (t2cmt     (ed-decompress-pt (range-proof-t2cmt proof)))
+         (acmt      (ed-decompress-pt (range-proof-acmt proof)))
+         (scmt      (ed-decompress-pt (range-proof-scmt proof)))
+         |#
+         (yvec      (pow-vec y nbits))
+         (zsq       (m* z z))
          (xsq       (m* x x))
          (delta     (m- (m* (m- z zsq)
                             (reduce 'm+ yvec))
@@ -1499,9 +1534,6 @@ lock it to the recipient."
          (chck-v-l  (simple-commit *gpt* *hpt*
                                    (range-proof-tau_x proof)
                                    (range-proof-t_hat proof)))
-         (vcmt      (ed-decompress-pt (range-proof-vcmt proof)))
-         (t1cmt     (ed-decompress-pt (range-proof-t1cmt proof)))
-         (t2cmt     (ed-decompress-pt (range-proof-t2cmt proof)))
          (chck-v-r  (ed-add (ed-mul vcmt zsq)
                             (ed-add (ed-mul *gpt* delta)
                                     (ed-add (ed-mul t1cmt x)
@@ -1514,8 +1546,6 @@ lock it to the recipient."
              (hpows     (vec-add (vec-scale yvec z)
                                  (vec-scale (twos-vec nbits) zsq)))
              (gpows     (vec-scale (ones-vec nbits) (m- z)))
-             (acmt      (ed-decompress-pt (range-proof-acmt proof)))
-             (scmt      (ed-decompress-pt (range-proof-scmt proof)))
              (chk-p-l   (ed-add acmt
                                 (vec-commit scmt x
                                             *hs* hpows
@@ -1525,7 +1555,7 @@ lock it to the recipient."
         
         (when (ed-pt= chk-p-l p)
           (fast-validate-dot-prod-proof dot-proof))
-        ))))
+        )))))
 
 ;; -----------------------------------------------------------
 
@@ -1551,6 +1581,8 @@ lock it to the recipient."
   ;;
   ;; construct proof that c = <a b> and P = g^a h^b u^c
   ;;
+  (labels ((edx-compress-pt (pt)
+             pt))
   (um:nlet-tail iter ((n  (length a))
                       (g  *gs*)
                       (h  *hs*)
@@ -1618,7 +1650,7 @@ lock it to the recipient."
         
         (iter n/2 gp hp pp ap bp
               (cons (list x lcmpr rcmpr) accum)))
-      )))
+      ))))
 
 ;; -------------------------------------------------------
 #|
@@ -1691,6 +1723,8 @@ lock it to the recipient."
     svec))
   
 (defun fast-validate-dot-prod-proof (proof)
+  (labels ((xed-decompress-pt (pt)
+             pt))
   (let* ((nbits     *nbits*)
          (u         (ed-decompress-pt (dot-prod-proof-u proof)))
          (p         (ed-decompress-pt (dot-prod-proof-pcmt proof)))
@@ -1714,7 +1748,7 @@ lock it to the recipient."
                                   )))
                             xlrs
                             :initial-value p)))
-    (ed-pt= chk_l chk_r)))
+    (ed-pt= chk_l chk_r))))
 
 ;; ----------------------------------------------------------------------
 ;; test it out

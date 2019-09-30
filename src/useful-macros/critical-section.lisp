@@ -63,20 +63,47 @@ THE SOFTWARE.
      (sb-thread:with-recursive-lock (,g!lock)
         ,@body)))
 
+;; ------------------------------------------------------------------------
+
+(defun trim-lambda-args (args)
+  (mapcan (lambda (arg)
+            (cond
+             ((member arg '(&optional &key &allow-other-keys &rest))
+              nil)
+             ((consp arg)
+              (list (car arg)))
+             (t
+              (list arg))))
+          args))
+
+(defun format-clauses-for-dcase (clauses)
+    (mapcar (lambda (clause)
+              (let ((name  (first clause))
+                    (args  (second clause))
+                    (body  (cddr clause)))
+                `(,name ,(trim-lambda-args args)
+                        ,@body)
+                ))
+            clauses))
+      
+(defun format-clauses-for-defun (g!lam clauses)
+  (mapcar (lambda (clause)
+            (let* ((fname   (first clause))
+                   (fnargs  (second clause))
+                   (args    (trim-lambda-args fnargs)))
+              `(defun ,fname ,fnargs
+                 (funcall ,g!lam ',fname ,@args))))
+          clauses))
+
 #+:LISPWORKS
 (defmacro! defmonitor (clauses)
   `(let* ((,g!lock (mp:make-lock))
           (,g!lam  (lambda (&rest ,g!args)
                      (mp:with-lock (,g!lock)
                        (dcase ,g!args
-                         ,@clauses)))
+                         ,@(format-clauses-for-dcase clauses))))
                    ))
-     ,@(mapcar (lambda (clause)
-                 (let ((fname (first clause)))
-                   `(defun ,fname (&rest ,g!fargs)
-                      (apply ,g!lam ',fname ,g!fargs))))
-               clauses)
-     ))
+     ,@(format-clauses-for-defun g!lam clauses)))
 
 #+:LISPWORKS
 (editor:setup-indent "DEFMONITOR" 1 nil nil 'flet)

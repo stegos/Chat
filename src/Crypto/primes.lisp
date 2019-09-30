@@ -148,15 +148,15 @@ THE SOFTWARE.
   (do ((s   '(3 2)) ;; all other primes are (6*k +/- 1)
        (ix   6 (+ 6 ix)))
       ((>= ix 1000) (nreverse s))
-    (declare (integer ix)
+    (declare (fixnum ix)
              (cons s))
     (let ((p (1- ix)))
-      (declare (integer p))
+      (declare (fixnum p))
       (unless (member p s
                       :test #'divides?)
       (push p s)))
     (let ((q (1+ ix)))
-      (declare (integer q))
+      (declare (fixnum q))
       (unless (member q s
                       :test #'divides?)
         (push q s))) ))
@@ -164,71 +164,44 @@ THE SOFTWARE.
 ;; ----------------------------------------------------------
 
 (defun make-prime (k &optional (mr-iters 50))
-  ;; return a prime p, k < p < 2*k-2
+  "(make-prime k) - return a prime p, k < p < 2*k-2"
   ;; By Bertrand's Postulate, there is always at least one prime, p,
   ;; where k < p < 2*k-2, for k > 3
   (declare (integer k)
            (fixnum mr-iters))
   (cond ((< k 997)
-         (let ((ps (reduce (lambda (ps p)
-                             (if (< k p (* 2 (1- k)))
-                                 (cons p ps)
-                               ps))
-                           *primes*
-                           :initial-value nil)))
-           (values (elt ps (mt-random (length ps))) 1)))
+         (let* ((start (position-if (um:curry '< k) *primes*))
+                (end   (position-if (um:curry '< (* 2 (1- k))) *primes* :start start))
+                (ps    (subseq *primes* start end)))
+           (values (elt ps (mt-random (length ps)))
+                   1)))
 
         (t
-         (let ((lower (1+ k))
-               (upper (* 2 (1- k)))
-               (niter 0))
+         (let* ((lower (1+ k))
+                (upper (* 2 (1- k)))
+                (niter 0)
+                (n     (let ((x (random-between lower upper)))
+                         (- x (mod x 6) 1))))
            
            ;; Since fundamental theorem states that pi(n) ~ n/ln(n),
            ;; or density of primes is inversely proportional to number of decimal digits,
            ;; on average about ln(k)/2 trials will be needed
-           #| |#
-           (let ((n (1- (* 6 (ceiling (random-between lower upper) 6)))))
+           (labels ((tst1 (n)
+                      (incf niter)
+                      (and (is-prime? n mr-iters)
+                           n))
+                    (tst (n)
+                      (or (tst1 n)
+                          (tst1 (+ n 2)))))
              (values (or (um:nlet-tail iter> ((n n))
-                           (incf niter)
                            (when (< n upper)
-                             (cond ((is-prime? n mr-iters) n)
-                                   #||#
-                                   ;; test 1 mod 6
-                                   ((is-prime? (+ n 2) mr-iters)
-                                    (incf niter)
-                                    (+ n 2))
-                                   #||#
-                                   (t
-                                    (iter> (+ n 6))) )))
+                             (or (tst n)
+                                 (iter> (+ n 6)))))
                          (um:nlet-tail iter< ((n (- n 6)))
-                           (incf niter)
                            (when (> n lower)
-                             (cond ((is-prime? n mr-iters) n)
-                                   #||#
-                                   ;; test 1 mod 6
-                                   ((is-prime? (+ n 2) mr-iters)
-                                    (incf niter)
-                                    (+ n 2))
-                                   #||#
-                                   (t
-                                    (iter< (- n 6))) ))))
-                     niter))
-           #| |#
-           #|
-           (let ((n (logior 1 (random-between lower upper))))
-             (values (or (um:nlet-tail iter> ((n n))
-                           (incf niter)
-                           (when (< n upper)
-                             (cond ((is-prime? n) n)
-                                   (t (iter> (+ n 2))) )))
-                         (um:nlet-tail iter< ((n (- n 2)))
-                           (incf niter)
-                           (when (> n lower)
-                             (cond ((is-prime? n) n)
-                                   (t (iter< (- n 2))) ))))
-                     niter))
-           |#
-           ))
+                             (or (tst n)
+                                 (iter< (- n 6))))))
+                     niter))))
         ))
 
 #|
@@ -657,17 +630,31 @@ THE SOFTWARE.
   ;; assumes p odd > 3
   (declare (integer p)
            (fixnum mr-iters))
-  (cond
-   ((< p         1373653) (deterministic-miller-rabin-prime? p '(2 3)))
-   ((< p         9080191) (deterministic-miller-rabin-prime? p '(31 73)))
-   ((< p      4759123141) (deterministic-miller-rabin-prime? p '(2 7 61)))
-   ((< p   2152302898747) (deterministic-miller-rabin-prime? p '(2 3 5 7 11)))
-   ((< p   3474749660383) (deterministic-miller-rabin-prime? p '(2 3 5 7 11 13)))
-   ((< p 341550071728321) (deterministic-miller-rabin-prime? p '(2 3 5 7 11 13 17)))
-   (t                     (and (probabilistic-miller-rabin-prime? p mr-iters)
-                               (probabilistic-lucas-test p)))
-   ))
+  (or (and (< p 14)
+           (fast-locate p '(2 3 5 7 11 13)))
+      (and (= 1 (gcd p 30030))
+           (cond
+            ((< p         1373653) (deterministic-miller-rabin-prime? p '(2 3)))
+            ((< p         9080191) (deterministic-miller-rabin-prime? p '(31 73)))
+            ((< p      4759123141) (deterministic-miller-rabin-prime? p '(2 7 61)))
+            ((< p   2152302898747) (deterministic-miller-rabin-prime? p '(2 3 5 7 11)))
+            ((< p   3474749660383) (deterministic-miller-rabin-prime? p '(2 3 5 7 11 13)))
+            ((< p 341550071728321) (deterministic-miller-rabin-prime? p '(2 3 5 7 11 13 17)))
+            (t                     (and (probabilistic-miller-rabin-prime? p mr-iters)
+                                        (probabilistic-lucas-test p)))
+            ))))
 
+
+(defun fast-locate (p tbl)
+  ;; assumes tbl is in ascending order
+  (um:nlet-tail iter ((tbl tbl))
+    (when tbl
+      (destructuring-bind (hd &rest tl) tbl
+        (let ((diff (- p hd)))
+          (or (zerop diff)
+              (and (plusp diff)
+                   (iter tl))))
+        ))))
 
 (defun is-prime? (p &optional (mr-iters 50))
   (declare (integer p)
@@ -676,9 +663,72 @@ THE SOFTWARE.
    ((< p 2)   nil)
    ((< p 4)   t)
    ((evenp p) nil)
+   ((/= 1 (mod (* p p) 24)) nil)
+   ((< p 1000)
+    (fast-locate p *primes*))
    (t         (miller-rabin-prime? p mr-iters))
    ))
 
+(defun find-generator (p)
+  (assert (is-prime? p))
+  (let* ((p-1 (1- p)))
+    (multiple-value-bind (fs q) (factors-of p-1)
+      (um:nlet-tail outer ((g  (random-between 2 p)))
+        (if (= 1 (expt-mod g (/ p-1 q) p))
+            (outer (random-between 2 p))
+          (um:nlet-tail inner ((s fs))
+            (if (endp s)
+                g
+              (let ((q (caar s)))
+                (if (= 1 (expt-mod g (/ p-1 q) p))
+                    (outer (random-between 2 p))
+                  (inner (cdr s))
+                  ))))
+          )))))
+
+(defun find-small-generator (p)
+  (assert (is-prime? p))
+  (let* ((p-1 (1- p)))
+    (multiple-value-bind (fs q) (factors-of p-1)
+      (um:nlet-tail outer ((gs  *primes*))
+        (if (endp gs)
+            (error "can't find small generator")
+          (let ((g  (car gs)))
+            (if (= 1 (expt-mod g (/ p-1 q) p))
+                (outer (cdr gs))
+              (um:nlet-tail inner ((s fs))
+                (if (endp s)
+                    g
+                  (let ((q (caar s)))
+                    (if (= 1 (expt-mod g (/ p-1 q) p))
+                        (outer (cdr gs))
+                      (inner (cdr s))
+                      ))))
+              )))))))
+
+(defun find-small-generator-with-factors (p factors)
+  (assert (is-prime? p))
+  (let* ((p-1 (1- p)))
+    (um:nlet-tail outer ((gs  *primes*))
+      (if (endp gs)
+          (error "can't find small generator")
+        (let ((g  (car gs)))
+          (um:nlet-tail inner ((s factors))
+            (if (endp s)
+                g
+              (let ((q (car s)))
+                (if (= 1 (expt-mod g (/ p-1 q) p))
+                    (outer (cdr gs))
+                  (inner (cdr s))
+                  ))))
+          )))))
+#|
+  (1- *ed-r*) curve1174
+  2^4 3^2 5^2 7 17 5662229 53308853141 60171084739669153 152435752726607681 762707485068427817
+(find-small-generator-with-factors edec:*ed-r* '(2 3 5 7 17 5662229 53308853141 60171084739669153 152435752726607681 762707485068427817))
+(find-small-generator-with-factors edec:*ed-q* '(2 19 3121 30510656070643106182115999270826633842178510774222732476374386585332681))
+
+  |#
 ;; ------------------------------------------------------------
 
 (defun extended-gcd (a b)
@@ -1208,6 +1258,7 @@ THE SOFTWARE.
 
 ;; -----------------------------------------------
 
+#|
 (defun make-nbit-prime (nbits hash-type)
   (declare (fixnum nbits))
   (assert (>= (* 8 (ironclad:digest-length hash-type)) nbits))
@@ -1222,6 +1273,7 @@ THE SOFTWARE.
           for q of-type integer = (- (+ base u) (logand u 1))
           when (is-prime? q)
           do (return (values q seed))) ))
+|#
 
 (defun gen-dsa-primes (nbits lbits hash-type)
   (declare (fixnum nbits lbits))
@@ -1311,6 +1363,55 @@ THE SOFTWARE.
 (defun par-make-2kp+1-prime (nbits &optional (mr-iters 50))
   (declare (fixnum nbits mr-iters))
   (par-try 4 300 #'make-2kp+1-prime nbits mr-iters))
+
+(defun make-nbit-random (nbits)
+  (random-between (2^ (1- nbits)) (1- (2^ nbits))))
+
+#|
+(defun make-rigid-prime (nbits &key (mr-iters 50) deterministic)
+  (declare (fixnum nbits mr-iters))
+  ;; a rigid prime is of the form p = (2*u+1) where u is also prime
+  (let* ((p  (if deterministic
+                 (vec-repr:int (hash:get-hash-nbits (1- nbits) deterministic))
+               (make-nbit-random (1- nbits))))
+         (p  (+ p (- 5 (mod p 6)))))
+    (um:nlet-tail iter ((p  p))
+      (if (is-prime? p mr-iters)
+          (let ((2p+1 (1+ (ash p 1))))
+            (if (is-prime? 2p+1 mr-iters)
+                2p+1
+              (iter (+ p 6))))
+        (iter (+ p 6))))
+    ))
+|#
+
+(defun make-strong-prime (nbits &key (mr-iters 50) deterministic)
+  (declare (fixnum nbits mr-iters))
+  ;; a strong prime is of the form p = (2*u+1) where u is also prime
+  ;; the product n = p*q of two strong primes produces a rigid modulus
+  (let* ((p  (if deterministic
+                 (vec-repr:int (hash:get-hash-nbits (1- nbits) deterministic))
+               (make-nbit-random (1- nbits))))
+         (p  (- p (mod p 6) 1)))
+    (labels ((chk (x)
+               (when (is-prime? x mr-iters)
+                 (let ((2x+1 (1+ (ash x 1))))
+                   (and (is-prime? 2x+1 mr-iters)
+                        2x+1)))))
+      (um:nlet-tail iter ((p  p)
+                          (q  (- p 6)))
+        (or (chk p)
+            (chk q)
+            (iter (+ p 6) (- q 6))))
+      )))
+
+(defun make-nbit-prime (nbits &optional (start 1))
+  (let ((dn (ash 1 14)))
+    (um:nlet-tail iter ((n  (1+ (ash 1 nbits)))
+                        (ix start))
+      (if (is-prime? n)
+          (values n ix)
+        (iter (- n (* ix dn)) (1+ ix))))))
 
 ;; ------------------------------------------------------------------------
 ;;

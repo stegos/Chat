@@ -33,7 +33,7 @@ THE SOFTWARE.
                 (:file "cached-var")
                 (:file "modular-arith")
                 (:file "utilities")
-                (:file "vec-repr")
+                (:file "vec-repr-2")
                 (:file "hash")
                 (:file "ctr-hash-drbg")
                 (:file "primes")
@@ -52,6 +52,7 @@ THE SOFTWARE.
                  "mpcompat"
                  "lisp-object-encoder"
                  "s-base64"
+                 "cl-base58"
                  "emotiq"
                  "emotiq/delivery"
                  "cffi"

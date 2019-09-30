@@ -30,53 +30,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 |#
 
-(defpackage :lisp-object-encoder
-  (:use #:common-lisp)
-  (:nicknames #:loenc)
-  (:import-from #:sdle-store
-   #:store-object
-   #:store-count
-   #:read-count
-   #:restore-object
-   #:register-code
-   #:next-available-code
-   #:$unbound-marker
-   #:after-retrieve
-   #:rawbytes
-   #:rawbytes-bytes
-   #:make-rawbytes)
-  (:export
-   #:register-code
-   #:next-available-code
-   #:defstore
-   #:defrestore
-   #:store-count
-   #:store-object
-   #:read-count
-   #:restore-object
-   #:skip-data
-   #:read-data
-   #:decode-prefix-length
-   #:read-prefix-length
-   #:read-raw-bytes
-   #:must-read-raw-bytes
-   #:encode-prefix-length
-   #:encode
-   #:decode
-   #:serialize
-   #:deserialize
-   #:after-retrieve
-   #:early-eof
-   #:$unbound-marker
-   #:rawbytes
-   #:rawbytes-bytes
-   #:make-rawbytes
-   #:with-stack-buffer
-   #:decode-prefix-length
-   #:loe-back-end
-   #:ensure-portable-condition
-   ))
-
 ;; ---------------------------------------------------------------
 (in-package #:lisp-object-encoder)
 ;; ---------------------------------------------------------------
@@ -118,13 +71,30 @@ THE SOFTWARE.
 (defconstant +UUID-code+ (register-code 127 'uuid))
 
 (defstore (obj UUID:UUID stream)
-  (store-count +UUID-code+ stream)
+  (output-type-code +UUID-code+ stream)
   (write-sequence (uuid:uuid-to-byte-array obj) stream))
 
 (defrestore (uuid stream)
   (with-stack-buffer (arr 16)
     (read-sequence arr stream)
     (uuid:byte-array-to-uuid arr)))
+
+;; ---------------------------------------------------------------
+
+(defconstant +LZW-code+ (register-code 126 'lzw))
+
+(defstore (obj LZW:COMPRESSED stream)
+  (output-type-code +LZW-code+ stream)
+  (let ((data (lzw:compressed-data obj)))
+    (store-count (length data) stream)
+    (write-sequence data stream)))
+
+(defrestore (lzw stream)
+  (let* ((nb  (read-count stream))
+         (vec (make-array nb :element-type '(unsigned-byte 8))))
+    (read-sequence vec stream)
+    (lzw:make-compressed
+     :data vec)))
 
 ;; -------------------------------------------
 

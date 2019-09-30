@@ -48,18 +48,19 @@ THE SOFTWARE.
 
 ;; ----------------------------------------------
 
-(defmethod add (key val (map tree))
-  (sets:add (make-map-cell
-             :key key
-             :val val)
-            map))
+(defmethod add (key val (map tree) &key (replace t))
+  (sets:with-replacement-p replace
+    (sets:add (make-map-cell
+               :key key
+               :val val)
+              map)))
 
 (defmethod find (key (map tree) &optional default)
   ;; eval with contant stack space - S(1)
   (multiple-value-bind (found cell) (mem key map)
     (if found
         (values (map-cell-val cell) t)
-      default)))
+      (values default nil))))
 
 (defmethod fold (f (map tree) accu)
   ;; eval with S(Log2(N))
@@ -109,6 +110,14 @@ THE SOFTWARE.
     (if (every #'map-cell-p elts)
         (let ((keys (mapcar #'map-cell-key elts))
               (vals (mapcar #'map-cell-val elts)))
-          (values :entries (list (mapcar #'cons keys vals))))
+          (values keys vals)) ;; :entries (list (mapcar #'cons keys vals))))
       (values :elements (list elts)))))
+
+(defmethod key-fn ((cell map-cell))
+  (map-cell-key cell))
+
+#+:LISPWORKS
+(defmethod lispworks:get-inspector-values ((map sets:node) (mode (eql 'graph-form)))
+  (declare (ignore mode))
+  (values :graph (sets:view-set map)))
 #||#  

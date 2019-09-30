@@ -304,23 +304,10 @@ THE SOFTWARE.
 ;; Abstract superclass for crypto objects. These are just wrappers
 ;; around UB8V objects. All subclasses share the same immutable slot.
 
-(defclass crypto-val (ub8v-repr)
-  ((val  :reader   crypto-val-vec
-         :initarg  :value))
+(defclass crypto-val (bev)
+  ((val  :reader crypto-val-vec
+         :initarg :vec))
   (:documentation "Base class for objects used in pairing crypto"))
-
-(defmethod ub8v-repr ((x crypto-val))
-  "All crypto values are really just UB8V objects with a wrapper.
-Usually, they are in big-endian representation for PBC library."
-  (crypto-val-vec x))
-
-(defmethod print-object ((obj crypto-val) out-stream)
-  (if *print-readably*
-      (call-next-method)
-    ;; else
-    (print-unreadable-object (obj out-stream :type t)
-      (princ (short-str (hex-str obj)) out-stream))
-    ))
 
 ;; -------------------------------------------------
 ;; Useful subclasses
@@ -413,14 +400,11 @@ alpha1 9476715580407735251767803811432601203461520366585714647829339610866164227
 .end
 )
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "01e4c2281e669cff6761156a9f3e1e5a162f191ebfe60b33544bbd561984114353f9ea193cd2e768ca4d692f0f26b2a04298a726c5328b83b001")))
+         :pt (bev-vec
+              "01e4c2281e669cff6761156a9f3e1e5a162f191ebfe60b33544bbd561984114353f9ea193cd2e768ca4d692f0f26b2a04298a726c5328b83b001"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "00e4d7941297819a73c6218cf286aa008015aa7d5705d174aa2b60fe2f264ca7bf36d74aa9398921d16d332636cbe79b188812a2dc2d268c5a01db8f3931b3303a5fddeb4b75064a0172f8c26c40066e83be75a6638a04249df3a86999f311d55b4c8eadf4527de05923aeb0ea434a57ca8700")))
-)
+         :pt (bev-vec
+              "00e4d7941297819a73c6218cf286aa008015aa7d5705d174aa2b60fe2f264ca7bf36d74aa9398921d16d332636cbe79b188812a2dc2d268c5a01db8f3931b3303a5fddeb4b75064a0172f8c26c40066e83be75a6638a04249df3a86999f311d55b4c8eadf4527de05923aeb0ea434a57ca8700")))
 
   "Pairing parameters adapted to ensure q is as large as possible within
 the constraints that q < 2^449, q and r prime, q = 3 mod 4, q = 4 mod
@@ -433,7 +417,7 @@ Was shooting for q ~ 2^448, but Lynn's library chokes on that. Works fine on 2^4
 
 (defparameter *chk-pairing-fr449-params*
   ;; = (hex-str (hash/256 *pairing-fr449-params*))
-  "0211B88787A03BA1D2E6C712A7721243824D684D08F7F5570E6EC0582AAFAC22")
+  "667562D01F0735EA6853A2D3634EE480DF8F70DDA0D1D35DE424E58F3D4E4409")
 
 ;; ---------------------------------------------------------------------------------------
 ;; from modified genfparam 256
@@ -453,13 +437,11 @@ alpha1 6636717311640939225221773794025903824279396271512712979193178803283298759
 .end
 )
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500")))
+         :pt (bev-vec
+              "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01"))))
+         :pt (bev-vec
+              "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01")))
 
   "Pairing parameters adapted to ensure q is as large as possible within
 the constraints that q < 2^256, q and r prime, q = 3 mod 4, q = 4 mod
@@ -471,7 +453,7 @@ Size of q^12 is 3072 bits.")
 
 (defparameter *chk-pairing-fr256-params*
   ;; = (hex-str (hash/256 *pairing-fr256-params*))
-  "0E0F49A1373C5FCE50FD085F6E4EF337EB3FC2FACD4C884273D790ED426A649F")
+  "116C13BB591E22B3075150DA151171F91E7AB7C5B4403F231C2A04CC79A45A4A")
 
 ;; ---------------------------------------------------------------------------------------
 ;; from modified genfparam 255
@@ -492,13 +474,11 @@ alpha1 4846306509135197722626130231530699996263396894940761743309363556183851578
 )
 #|
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500")))
+         :pt (bev-vec
+              "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                             :str "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01")))
+          :pt (bev-vec
+               "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01"))
 |#
 )
 
@@ -528,13 +508,11 @@ alpha1 2842595934937549310622048831018115941786647673109572122772923852932920186
 )
 #|
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500")))
+         :pt (bev-vec
+                "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                             :str "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01")))
+         :pt (bev-vec
+              "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01"))
 |#
 )
 
@@ -565,13 +543,11 @@ alpha1 3457062278036935090605497712914356157720398864201376877014371651154620662
 )
 #|
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500")))
+         :pt (bev-vec
+              "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                             :str "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01")))
+         :pt (bev-vec
+              "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01"))
 |#
 )
 
@@ -602,13 +578,11 @@ alpha1 1834762267872627615913576713739874445842189413874826238298856794223727710
 )
 #|
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500")))
+         :pt (bev-vec
+              "ff8f256bbd48990e94d834fba52da377b4cab2d3e2a08b6828ba6631ad4d668500"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                             :str "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01")))
+         :pt (bev-vec
+              "e20543135c81c67051dc263a2bc882b838da80b05f3e1d7efa420a51f5688995e0040a12a1737c80def47c1a16a2ecc811c226c17fb61f446f3da56c420f38cc01"))
 |#
 )
 
@@ -636,20 +610,18 @@ alpha1 3001017353864017826546717979647202832842709824816594729108687826591920660
 .end
 )
    :g1  (make-instance 'g1-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "0761cf30e9ce29716b7c5b7bb25b62371b64f73bb1515487de78beeda041f98f01")))
+         :pt (bev-vec
+              "0761cf30e9ce29716b7c5b7bb25b62371b64f73bb1515487de78beeda041f98f01"))
    :g2  (make-instance 'g2-cmpr
-         :pt (bev
-              (make-instance 'hex
-                :str "05063635c1a668e13ff75dc50e3ee70691956c1e3a7a1aa753949bfc5a2c64b1089295808a7b287851ed003e0c03de12be1ab149825c21c909f0c440e145d0b000"))))
+         :pt (bev-vec
+              "05063635c1a668e13ff75dc50e3ee70691956c1e3a7a1aa753949bfc5a2c64b1089295808a7b287851ed003e0c03de12be1ab149825c21c909f0c440e145d0b000")))
 
   "Ben Lynn's quick and dirty F-type generation. This curve will wrap
 3 out of 4 hash/256")
 
 (defparameter *chk-pairing-fr256-params-old*
   ;; = (hex-str (hash/256 *pairing-fr256-params-old*)) 
-  "659F19A5857410227DB8650FB72F227A9E5D80CD39BBB0BFE02C516AD0C87343")
+  "6F50560941366EF498B658FB1D8FC80F842E444412E06B8C0E2F93598F06E796")
 
 ;; ---------------------------------------------------------------------------------------
 (defparameter *pairing-default-ar160-params*
@@ -669,11 +641,11 @@ sign0 1
 .end
 )
    :g1  (make-instance 'g1-cmpr
-         :pt (make-instance 'base58
-              :str "BirBvAoXsqMYtZCJ66wwCSFTZFaLWrAEhS5GLFrd96DGojc9xfp7beyDPxC5jSuta3yTMXQt7BXLTpam9dj1MVf7m"))
+         :pt (bev-vec
+              "797EF95B4B2DED79B0F5E3320D4C38AE2617EB9CD8C0C390B9CCC6ED8CFF4CEA4025609A9093D4C3F58F37CE43C163EADED39E8200C939912B7F4B047CC9B69300"))
    :g2  (make-instance 'g2-cmpr
-         :pt (make-instance 'base58
-              :str "FXJJmcVJsYYG8Y89AZ9Z51kjVANBD68LQi7pD28EG92dxFoWijrcrDaVVYUgiB9yv4GazAAGg7ARg6FeDxCxetkY8")))
+         :pt (bev-vec
+              "A4913CAB767684B308E6F71D3994D65C2F1EB1BE4C9E96E276CD92E4D2B16A2877AA48A8A34CE5F1892CD548DE9106F3C5B0EBE7E13ACCB8C41CC0AE8D110A7F01")))
 "Ben Lynn's favorite default - 160 bits symmetric pairing.
 Unfortunately, we are a decade later than when these curves were
 developed and 80-bit security is no longer sufficient. But this curve
@@ -681,8 +653,8 @@ serves as a check on our implementation with his pbc-calc for
 comparison.")
 
 (defparameter *chk-pairing-default-ar160-params*
-  ;; = (hex-str (hash/256 *pairing-default-ar160-params*)) 
-  "89DACDBD695829EE59A0DF5EDA97D9EB65CB4FFC2B17270E61FD8521BA3B1376")
+  ;; = (hex-str (hash/256 *pairing-default-ar160-params*))
+  "4DD3AB6DF2424BEE2A05885EB6D1DD2C147B8945BF440C7A45CECB6B41BA568F")
 
 ;; ---------------------------------------------------------------------------------------
 
@@ -818,19 +790,13 @@ SMP access. Everything else should be SMP-safe."
 
 (defun raw-bytes (x)
   ;; used only in encrypt/decrypt where message is stored as BEV
-  (bev-vec (bev x)))
-
-(defun construct-bev (vec)
-  ;; careful here... this assumes vec is UB8-VECTOR
-  ;; more efficient internally when we know vec.
-  (make-instance 'bev
-                 :vec vec))
+  (bev-vec x))
 
 (defun xfer-foreign-to-lisp (fbuf nel)
   (let ((lbuf (make-ub8-vector nel)))
     (dotimes (ix nel)
       (setf (aref lbuf ix) (cffi:mem-aref fbuf :uint8 ix)))
-    (construct-bev lbuf)))
+    lbuf))
 
 (defun ensure-bevn (buf nel)
   (bev-vec (bevn buf nel)))
@@ -942,7 +908,7 @@ library."
                    :pt  (xfer-foreign-to-lisp ptbuf *g2-size*))
     )))
 
-(defmethod %zr ((zbuf bev))
+(defmethod %zr (zbuf)
   ;; we take care here to keep %zr an internal-use-only function.
   ;; we can't accept just any old BEV argument.
   (make-instance 'zr
@@ -1120,8 +1086,8 @@ Certification includes a BLS Signature on the public key."
   ;; keying material. Use symmetric encryption for bulk message
   ;; encryption. But this will work regardless.
   (let* ((pkid      (make-public-subkey pkey id))
-         (tstamp    (construct-bev (uuid:uuid-to-byte-array
-                                    (uuid:make-v1-uuid))))
+         (tstamp    (uuid:uuid-to-byte-array
+                     (uuid:make-v1-uuid)))
          (msg-bytes (loenc:encode msg))
          (nmsg      (length msg-bytes))
          (xlen      (* 32 (ceiling nmsg 32)))
@@ -1132,7 +1098,7 @@ Certification includes a BLS Signature on the public key."
                           cloaked)
                       ;; else
                       msg-bytes))
-         (xmsg      (construct-bev xbytes))
+         (xmsg      (coerce xbytes 'ub8-vector))
          (rhsh      (hash-to-pbc-range id tstamp xmsg)))
     (with-fli-buffers ((hbuf  32         rhsh)   ;; hash value
                        (pbuf  *gt-size*)         ;; returned pairing
@@ -1141,8 +1107,7 @@ Certification includes a BLS Signature on the public key."
       (_sakai-kasahara-encrypt *context* rbuf pbuf kbuf hbuf 32)
       (let* ((pval (get-raw-hash-nbytes xlen (xfer-foreign-to-lisp pbuf *gt-size*)))
              (cmsg (make-instance 'crypto-text
-                                  :vec (construct-bev
-                                        (map-into pval 'logxor pval xbytes))))
+                                  :vec (map-into pval 'logxor pval xbytes)))
              (rval (make-instance 'g2-cmpr
                                   :pt (xfer-foreign-to-lisp rbuf *g2-size*))))
         (make-instance 'crypto-packet
@@ -1169,13 +1134,12 @@ Certification includes a BLS Signature on the public key."
         (let* ((cmsg-bytes (raw-bytes cmsg))
                (nb         (length cmsg-bytes))
                (pval (get-raw-hash-nbytes nb (xfer-foreign-to-lisp pbuf *gt-size*)))
-               (msg  (construct-bev
-                      (map-into pval 'logxor pval cmsg-bytes)))
+               (msg  (map-into pval 'logxor pval cmsg-bytes))
                (hval (hash-to-pbc-range id tstamp msg)))
           (with-fli-buffers ((hbuf 32        hval)
                              (kbuf *g2-size* pkey))
             (when (zerop (_sakai-kasahara-check *context* rbuf kbuf hbuf 32))
-              (loenc:decode (raw-bytes msg))))
+              (loenc:decode msg)))
           )))))
 
 ;; -----------------------------------------------
@@ -1218,7 +1182,7 @@ Certification includes a BLS Signature on the public key."
                  :pt ans))
 
 (defun make-zr-ans (ans)
-  (%zr ans))
+  (%zr (bev-vec ans)))
 
 (defun make-gT-ans (ans)
   (make-instance 'gt
@@ -1314,7 +1278,7 @@ Certification includes a BLS Signature on the public key."
   ;; Zr is the only group for which arbitrary integer values are
   ;; valid. All others must be derived from extant group (subgroup)
   ;; members.
-  (%zr (bev (mod val (get-order)))))
+  (%zr (bev-vec (mod val (get-order)))))
 
 (defmethod add-zrs (z1 z2)
   ;; add two elements from Zr ring
@@ -1341,7 +1305,7 @@ Certification includes a BLS Signature on the public key."
   ;; Careful here... z^(q-1) = 1, z^q = z
   (binop '_exp-zr-vals
          (zr z1)
-         (%zr (bev (mod (int z2) (1- (get-order)))))
+         (%zr (bev-vec (mod (int z2) (1- (get-order)))))
          *zr-size* *zr-size* 'make-zr-ans))
 
 (defmethod neg-zr (zr)
@@ -1599,7 +1563,7 @@ and then checking the pairing relation:
 "
   (assert (typep pkey-vendor 'g2-cmpr))
   (with-mod (get-order)
-    (let* ((krand  (field-random (get-order)))
+    (let* ((krand  (safe-field-random (get-order)))
            (tbuy   (mul-pt-zr (get-g1)
                               (m/ (m* krand (int skey))
                                   (m- paid change))))

@@ -40,32 +40,6 @@ THE SOFTWARE.
 
 (in-package :common-lisp)
 
-(defpackage :prevalent-object
-  (:use #:common-lisp)
-  (:nicknames #:prevo)
-  (:export
-   #:*prevalent-system*
-   #:*default-prevalent-filename*
-   #:system
-
-   #:open-system
-   #:save-system
-   #:restore-system
-   #:close-system
-   
-   #:add-root-object
-   #:remove-root-object
-   #:get-root-object
-   #:root-keys
-   #:touch-slot
-   
-   #:prevalent-class
-   #:prevalent-object
-   
-   #:remove-object
-   #:mutate-object
-   ))
-
 ;; --------------------------------------------------------------------------------------
 (in-package :prevalent-object)
 ;; --------------------------------------------------------------------------------------

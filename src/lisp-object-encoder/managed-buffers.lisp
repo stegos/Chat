@@ -30,16 +30,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 |#
 
-(defpackage :managed-buffers
-  (:use #:common-lisp #:priq)
-  (:nicknames #:mgdbuf)
-  (:export
-   #:make-buffer
-   #:init-buffer-queues
-   #:get-buffer
-   #:recycle-buffer
-   #:with-temporary-buffer))
-
 ;; ------------------------------------------------------------
 (in-package #:managed-buffers)
 ;; -------------------------------------------------------------

@@ -847,6 +847,13 @@ THE SOFTWARE.
    #:nest
    #:fst
    #:snd
+
+   #:*print-bignum-abbrev*
+   #:without-abbrev
+   #:abbrev-str
+
+   #:sepi
+   #:sepfp
    ))
 
 #|

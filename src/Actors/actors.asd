@@ -32,12 +32,16 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                 #-:lispworks
                 (:file "ansi-timer")
                 (:file "actors")
+                (:file "erl-proc")
+                (:file "par-exec")
                 (:file "actors-machines")
+                (:file "actors-futures")
                 (:file "actors-schedule")
                 (:file "actors-startup"))
   :SERIAL T
   :depends-on   ("data-objects"
                  "trivia"
 		 "mpcompat"
+                 "cps"
                  ))
 

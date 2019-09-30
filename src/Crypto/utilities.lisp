@@ -508,6 +508,21 @@ THE SOFTWARE.
 (defun field-random (base)
   (random-between 1 base))
 
+(defun safe-field-random (base)
+  ;; nondeterministic random in the range (Sqrt[base], base-Sqrt[base])
+  
+  ;; Safe, because if field is large enough all the values will be far
+  ;; enough away from field limits (0, base) to discourage brute force
+  ;; search against small positive and negative field values.
+  (funcall (get-cached-symbol-data
+            'safe-field-random 'safe-field-random-fn base
+            (lambda ()
+              (let* ((lo  (isqrt base))
+                     (hi  (- base lo)))
+                (lambda ()
+                  (random-between lo hi))))
+            )))
+
 ;; ---------------------------------------------------------
 
 (defun mask-off (arr rembits)

@@ -21,6 +21,57 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 |#
+;; -----------------------------------------------------------------------
+;; List Comprehension = (lc h q1 q2 ... )
+;;
+;; where h is the head and q_i are qualifiers.
+;;
+;; HEAD:
+;; Head form h can be any lisp form, or one of
+;;    :COUNT,
+;;    :SOME,
+;;    :NOTANY,
+;;    :EVERY,
+;;    :NOTEVERY,
+;;     (:SUM form),
+;;     (:MAXIMIZE form),
+;;     (:MINIMIZE form),
+;;     (:APPEND form),
+;;     (:NCONC form),
+;;     (:DO form*)
+;;
+;; QUALIFIERS:
+;; A qualifier may be either a generator or a filter.
+;;
+;;   GENERATORS:
+;;   A generator has the form (x <- X)
+;;   where x is either an identifier or a list, and X is a Lisp
+;;   expression yielding a sequence of type list, string, or vector.
+;;
+;;   When x is a symbol, it defines a new local variable. When x is a
+;;   list, it denotes that the sequence elements need to be
+;;   destructured.
+;;
+;;   Generators use operators <- <-// and <.. A sequence of generator
+;;   qualifiers implies a Cartesian product space. Generator <-// is
+;;   provided to perform parallel comprehension instead of a Cartesian
+;;   product.
+;;
+;;   (var <- seq)                                         ;; a generator
+;;   ((var1 var2 ...) <- seq)                             ;; a destructuring generator
+;;   ((var1 var2 ...) <-// seq1 seq2 ...)                 ;; a parallel generator
+;;   ((var1 (var2 var3 ...) var4 ...) <-// seq1 seq2 ...) ;; destructuring parallel generator
+;;   (var <.. start end &optional incr)                   ;; a numeric generator
+;;   (var <-f form)                                       ;; a let-binding generator
+;;
+;;   FILTERS:
+;;   A filter is a Boolean expression typically based on the variables
+;;   defined by generators.
+;;
+;; Using MAP in generators to allow the use of lists and vectors,
+;; interchangeably.
+;;
+;; -----------------------------------------------------------------------
 
 (defpackage #:list-comprehensions
   (:use #:common-lisp)
@@ -31,12 +82,14 @@ THE SOFTWARE.
 
 (in-package #:list-comprehensions)
 
+;; -----------------------------------------------------------------------
+
 (defun op-eq (sym op-sym)
   (and (symbolp sym)
        (string= (string sym) (string op-sym))))
 
 ;;; h is the head and qs the list of qualifiers
-(defmacro lc ((h &rest qs))
+(defmacro lc (h &rest qs)
   (cond
     ((eql h :count)
      (let ((count (gensym "count")))
@@ -88,39 +141,11 @@ THE SOFTWARE.
           )))
     ))
 
-;; Using MAP in generators to allow the use of lists and vectors,
-;; interchangeably.
-;;
-;; List Comprehension = ( h q1 q2 ... )
-;;
-;; where h is the head and q_i are qualifiers. A qualifier may be
-;; either a generator or a filter. A generator has the form (x <- X)
-;; where x is either an identifier or a list, and X is a Lisp
-;; expression yielding a sequence of type list, string, or vector. A
-;; filter is a Boolean expression typically based on the variables
-;; defined by generators.
-;;
-;; When x is a symbol, it defines a new local variable. When x is a
-;; list, it denotes that the sequence elements need to be
-;; destructured.
-;;
-;; Generators use operators <- <-// and <.. A sequence of generator
-;; qualifiers implies a Cartesian product space. Generator <-// is
-;; provided to perform parallel comprehension instead of a Cartesian
-;; product.
-;;
-;;  (var <- seq)  ;; a generator
-;;  ((var1 var2 ...) <- seq) ;; a destructuring generator
-;;  ((var1 var2 ...) <-// seq1 seq2 ...) ;; a parallel generator
-;;  ((var1 (var2 var3 ...) var4 ...) <-// seq1 seq2 ...) ;; destructuring parallel generator
-;;  (var <.. start end &optional incr) ;; a numeric generator
-;;  (var <-f form) ;; a let-binding generator
-;;
-;; Head form h can be any lisp form, or one of :COUNT, :SOME, :NOTANY, :EVERY, :NOTEVERY,
-;; (:SUM form), (:MAXIMIZE form), (:MINIMIZE form), (:APPEND form), (:NCONC form), (:DO form*)
 #|
-(lc ((:sum x) (x <- '(2 4 6)) (evenp x)))
+(lc (:sum x) (x <- '(2 4 6)) (evenp x))
+(lc (:sum x) (x <.. 0 10) (evenp x))
 |#
+
 (defun flcr (h qs tail)
   ;; tail is the identifier to access the end
   ;; of the resulting list.
@@ -197,55 +222,64 @@ THE SOFTWARE.
                                ,(destr (nreverse dargs) (nreverse gargs)))
                          ,@seqs))))
         
-        (cond ((op-eq op '<-// )  ;; parallel generation
-               (destructuring-bind ((&rest args) op &rest seqs) q1
-                 (declare (ignore op))
-                 (mapper-form args seqs)))
-              
-              ((op-eq op '<-) ;; list generator
-               (destructuring-bind (arg op seq) q1
-                 (declare (ignore op))
-                 (mapper-form (list arg) (list seq))))
-
-              ((op-eq op '<-f) ;; function application
-               (destructuring-bind (arg op form) q1
-                 (declare (ignore op))
-                 `(let ((,arg ,form))
-                    ,(flcr h qr tail))
-                 ))
-              
-              ((op-eq op '<..) ;; numeric generator
-               (destructuring-bind (v op start end &optional incr) q1
-                 (declare (ignore op))
-                 `(gen-seq ,start ,end ,incr
-                           (lambda (,v)
-                             ,(flcr h qr tail)))
-                 ))
-              
-              (t
-               (cond
-                ((eql h :every)
-                 `(if ,q1
-                      ,(flcr h qr tail)
-                    (return nil))) ;; filter
-
-                ((eql h :notevery)
-                 `(if ,q1
-                      ,(flcr h qr tail)
-                    (return t)))
-
-                (t
-                 `(if ,q1 ,(flcr h qr tail))) ;; filter
-                ))
-              )))))
+        (cond
+         ((op-eq op '<-// )  ;; parallel generation
+          (destructuring-bind ((&rest args) op &rest seqs) q1
+            (declare (ignore op))
+            (mapper-form args seqs)))
+         
+         ((op-eq op '<-) ;; list generator
+          (destructuring-bind (arg op seq) q1
+            (declare (ignore op))
+            (mapper-form (list arg) (list seq))))
+         
+         ((op-eq op '<-f) ;; function application
+          (destructuring-bind (arg op form) q1
+            (declare (ignore op))
+            `(let ((,arg ,form))
+               ,(flcr h qr tail))
+            ))
+         
+         ((op-eq op '<..) ;; numeric generator
+          (destructuring-bind (v op start end &optional incr) q1
+            (declare (ignore op))
+            `(gen-seq ,start ,end ,incr
+                      (lambda (,v)
+                        ,(flcr h qr tail)))
+            ))
+         
+         (t
+          (cond
+           ((eql h :every)
+            `(if ,q1
+                 ,(flcr h qr tail)
+               (return nil))) ;; filter
+           
+           ((eql h :notevery)
+            `(if ,q1
+                 ,(flcr h qr tail)
+               (return t)))
+           
+           (t
+            `(when ,q1 ,(flcr h qr tail))) ;; filter
+           ))
+         )))))
 
 (defun gen-seq (start end by fn)
   (cond ((>= end start)
-         (loop for ix from start to end by (or by 1)
-               do (funcall fn ix)))
+         (if by
+             (assert (plusp by))
+           (setf by 1))
+         (do ((ix start (+ ix by)))
+             ((>= ix end))
+           (funcall fn ix)))
         (t
-         (loop for ix from start downto end by (or by 1)
-               do (funcall fn ix)))
+         (if by
+             (assert (minusp by))
+           (setf by -1))
+         (do ((ix (+ start by) (+ ix by)))
+             ((< ix end))
+           (funcall fn ix)))
         ))
         
          
@@ -292,32 +326,33 @@ THE SOFTWARE.
 (loop for x across arr do (diddly x))
 
 ;; Pythagorean triples
-(lc ((list x y z)
-     (x <.. 1 100)
-     (y <.. (1+ x) 100)
-     (z <.. (1+ y) 100)
-     (= (* z z) (+ (* x x) (* y y)))))
+(lc (list x y z)
+    (x <.. 1 100)
+    (y <.. (1+ x) 100)
+    (z <.. (1+ y) 100)
+    (= (* z z) (+ (* x x) (* y y))))
 
-(lc (x
-     ((x y) <-//
-      (vector 1 2 3)
-      (list 'a 'b 'c))))
+(lc x
+    ((x y) <-//
+     (vector 1 2 3)
+     (list 'a 'b 'c)))
 
-(lc (x
-     (x <-
-      (vector 1 2 3))))
+(lc x
+    (x <-
+       (vector 1 2 3)))
 
-(lc ((list a b) ((a (b c) (d e)) <-// seq1 seq2 seq3) (tst a d)))
+(lc (list a b)
+    ((a (b c) (d e)) <-// seq1 seq2 seq3) (tst a d))
 
 (loop for x in lst append x)
 
 (defun tst (n)
   (time 
    (loop repeat n do
-         (lc ((list x y z)
-              (x <.. 1 100)
-              (y <.. (1+ x) 100)
-              (z <.. (1+ y) 100)
-              (= (* z z) (+ (* x x) (* y y))))))))
+         (lc (list x y z)
+             (x <.. 1 100)
+             (y <.. (1+ x) 100)
+             (z <.. (1+ y) 100)
+             (= (* z z) (+ (* x x) (* y y)))))))
 |#
 |#

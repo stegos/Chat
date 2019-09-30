@@ -41,7 +41,7 @@ THE SOFTWARE.
 
 ;; ----------------------------------------------------------------------
 
-#|
+#| |#
 (um:defmacro! dlambda (&rest ds)
   `(lambda (&rest ,g!args)
      (let ((,g!tail (cdr ,g!args)))
@@ -66,10 +66,10 @@ THE SOFTWARE.
 #+:LISPWORKS
 (editor:setup-indent "dcase" 1)
 
-|#
+#| |#
 
 ;; ----------------------------------------------------------------------
-#||#
+#|
 ;; equiv to #F
 ;; (declaim  (OPTIMIZE (SPEED 3) #|(SAFETY 0)|# #+:LISPWORKS (FLOAT 0)))
 ;; (declaim  (OPTIMIZE (SPEED 3) #+:LISPWORKS (FLOAT 0)))
@@ -106,7 +106,7 @@ THE SOFTWARE.
 #+:LISPWORKS
 (editor:setup-indent "DLAMBDA" 0 nil nil 'flet)
 
-#||#
+|#
 ;; -----------------------------------------------------------------
 
 #|

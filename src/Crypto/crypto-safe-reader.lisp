@@ -41,15 +41,15 @@ THE SOFTWARE.
 
 (defun make-pkey (hex-str)
   (make-instance 'public-key
-                 :value (bev (hex hex-str))))
+                 :val (bev-vec hex-str)))
 
 (defun make-skey (hex-str)
   (make-instance 'secret-key
-                 :value (bev (hex hex-str))))
+                 :val (bev-vec hex-str)))
 
 (defun make-sig (hex-str)
   (make-instance 'signature
-                 :value (bev (hex hex-str))))
+                 :val (bev-vec hex-str)))
 
 (defun make-addr (base58-str)
   (make-instance 'address

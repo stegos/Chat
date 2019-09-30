@@ -260,11 +260,12 @@ THE SOFTWARE.
       (read-from-string (delete #\- s))))
     
 (defun convert-other-base-number (s)
-  ;; #xNNNN_NNNN_NNN
+  ;; 0xNNNN_NNNN_NNN
   (when (or (#~m/^0[xXoObB]/ s)
             (#~m/^[0-9]+[rR]/ s))
     (ignore-errors
-      (read-from-string (format nil "#~A" (remove-separators s))))))
+      (read-from-string (format nil "#~A" (remove-separators s))))
+    ))
     
 (defun read-extended-number-syntax (s)
   (cond ((convert-real-or-complex s))
@@ -282,10 +283,10 @@ THE SOFTWARE.
 (defun |reader-for-#N| (stream sub-char numarg)
   (declare (ignore sub-char numarg))
   (let* ((v   (read stream t nil t))
-         (ans (if (symbolp v)
-                  (or (read-extended-number-syntax (symbol-name v))
-                      v)
-                v)))
+         (ans (or (when (or (stringp v)
+                            (symbolp v))
+                    (read-extended-number-syntax (string v)))
+                  v)))
     (unless *read-suppress*
       ans)))
 

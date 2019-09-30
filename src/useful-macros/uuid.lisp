@@ -317,13 +317,13 @@ INTERNAL-TIME-UINITS-PER-SECOND which gives the ticks per count for the current 
 
 (defmethod print-object ((id uuid) stream)
   "Prints an uuid in the string represenation of an uuid. (example string 6ba7b810-9dad-11d1-80b4-00c04fd430c8)"
-  (format stream "{~8,'0X-~4,'0X-~4,'0X-~2,'0X~2,'0X-~12,'0X}" 
-	  (time-low id)
-	  (time-mid id)
-	  (time-high id)
-	  (clock-seq-var id)
-	  (clock-seq-low id)
-	  (node id)))
+  (format stream "~({~8,'0X-~4,'0X-~4,'0X-~2,'0X~2,'0X-~12,'0X}~)" 
+          (time-low id)
+          (time-mid id)
+          (time-high id)
+          (clock-seq-var id)
+          (clock-seq-low id)
+          (node id)))
 
 (defmethod print-object :around ((id uuid) stream)
   (if *print-readably*
@@ -337,7 +337,7 @@ INTERNAL-TIME-UINITS-PER-SECOND which gives the ticks per count for the current 
 
 (defun print-bytes (stream uuid)
   "Prints the raw bytes in hex form. (example output 6ba7b8109dad11d180b400c04fd430c8)"
-  (format stream "{~8,'0X~4,'0X~4,'0X~2,'0X~2,'0X~12,'0X}" 
+  (format stream "~({~8,'0X~4,'0X~4,'0X~2,'0X~2,'0X~12,'0X}~)" 
 	  (time-low uuid)
 	  (time-mid uuid)
 	  (time-high uuid)
@@ -448,7 +448,7 @@ built according code-char of each number in the uuid-string"
 			 (loop with max = (- (length uuid-string) 2)
 			       for i = 0 then (+ i 2)
 			       as j = (+ i 2)
-			       as cur-pos = (parse-integer (subseq uuid-string i j) :radix 16)
+			       as cur-pos = (parse-integer uuid-string :start i :end j :radix 16)
 			       do (format out "~a" (code-char cur-pos))
 			       while (< i max))
 			 out))
@@ -558,7 +558,7 @@ built according code-char of each number in the uuid-string"
                             (uuid:make-uuid-from-string (string sym))))
 |#
 
-(defun uuid (str)
+(defmethod uuid (str)
   ;; string or symbol acceptable
   (make-uuid-from-string (string str)))
 

@@ -53,6 +53,11 @@ THE SOFTWARE.
    :mchi
    :quadratic-residue-p
    :m!
+
+   :mmax
+   :mmin
+   :bezout
+   :msigned
    ))
 
 #|
@@ -77,27 +82,44 @@ THE SOFTWARE.
    :ub8        ;; type
    :ub8-vector ;; type
    :make-ub8-vector
-   :ub8v-repr  ;; mixin class
    :ub8v
-   :ub8v-vec
+   :ub8v-obj
+   :ub8v-as-str
+   :ub8v-val
+   :ub8v-str
+   :val
    :lev
    :lev-vec
    :bev
    :bev-vec
    :base58
    :base58-str
+   :base58-chk
    :base64
    :base64-str
    :hex
    :hex-str
-   :int
    :levn
    :bevn
-   :convert-int-to-vector
-   :convert-vector-to-int
+   :convert-int-to-vec
+   :convert-vec-to-int
+   :int
    :int=
+   :int/=
+   :int<
+   :int<=
+   :int>
+   :int>=
+   :vec
+   :vec-cmp
    :vec=
+   :vec/=
+   :vec<
+   :vec<=
+   :vec>
+   :vec>=
    :sbs
+   :str
    :short-str
    :validate-base58-string
    ))
@@ -140,6 +162,7 @@ THE SOFTWARE.
    :basic-random-between
    :random-between
    :field-random
+   :safe-field-random
    
    :convert-int-to-nbytes
    :convert-int-to-nbytesv
@@ -271,6 +294,9 @@ THE SOFTWARE.
    :ed-vrf
    :ed-prove-vrf
    :ed-check-vrf
+
+   :modr
+   :modq
    ))
 
 (defpackage :lagrange-4-square
@@ -299,7 +325,8 @@ THE SOFTWARE.
         :modmath)
   (:nicknames :pbc)
   (:import-from :ecc-crypto-b571
-   :field-random)
+   :field-random
+   :safe-field-random)
   (:export
    ;; classes and their slot readers
    :crypto-val
@@ -460,7 +487,8 @@ THE SOFTWARE.
    :ctr-drbg
    :ctr-drbg-int
    :random-between
-   :field-random)
+   :field-random
+   :safe-field-random)
   (:export
    ;; from crypto/modular-arith
    :with-mod
@@ -468,11 +496,13 @@ THE SOFTWARE.
    :m=
    :m^
    :msqrt
+   :msqr
    :m+
    :m-
    :m*
    :m/
    :minv
+   :bezout
    :mmod
    :mchi
    :quadratic-residue-p
@@ -481,11 +511,25 @@ THE SOFTWARE.
    :bev
    :lev
    :base58
+   :base58-chk
    :base64
    :hex
    :int
    :int=
+   :int/=
+   :int<
+   :int<=
+   :int>
+   :int>=
+   :vec
+   :vec-cmp
    :vec=
+   :vec/=
+   :vec<
+   :vec<=
+   :vec>
+   :vec>=
+   :str
    :bev-vec
    :lev-vec
    :hex-str
@@ -563,6 +607,7 @@ THE SOFTWARE.
    :ctr-drbg-int
    :random-between
    :field-random
+   :safe-field-random
 
    :add-to-startups
    :add-to-shutdowns

@@ -61,6 +61,7 @@ THE SOFTWARE.
    #:with-exclusive-lock
    ;; in LW7
    #:process-terminate
+   #:funcall-async
    )
   #+(OR :LISPWORKS6 :LISPWORKS7)
   (:import-from #:sys
@@ -95,7 +96,7 @@ THE SOFTWARE.
    #:mailbox-read
    #:mailbox-empty?
    #:mailbox-empty-p
-
+   
    ;; new in Lispworks 6
    #:process-poke
    #:make-condition-variable
@@ -113,5 +114,6 @@ THE SOFTWARE.
    #:spin-critical
 
    #:CAS
+   #:funcall-async
    ))
 

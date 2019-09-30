@@ -42,27 +42,6 @@ THE SOFTWARE.
 (in-package :prevalent-object)
 ;; --------------------------------------------------------------------------------------
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (import '(loenc:store-count
-            loenc:store-object
-            loenc:read-count
-            loenc:restore-object
-            loenc:loe-back-end
-            loenc:serialize
-            loenc:deserialize
-            loenc:register-code
-            loenc:defrestore
-            loenc:defstore
-            
-            sdle-store:find-backend
-            sdle-store:defbackend
-            
-            um:if-let
-            um:when-let
-            um:magic-word
-            um:format-error
-            )))
-
 ;; ------------------------------------------------------------
 
 ;; the magic word for .snap snapshot files

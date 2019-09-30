@@ -45,21 +45,41 @@ THE SOFTWARE.
   (:import-from :mpcompat
    :make-lock
    :with-lock
-   :CAS)
+   :CAS
+   :make-mailbox
+   :mailbox-send
+   :mailbox-read)
+  (:import-from :cps
+   :=lambda
+   :=defun
+   :=defmethod
+   :=flet
+   :=labels
+   :=values
+   :=funcall
+   :=apply
+   :=bind
+   :=bind-cont
+   :with-cont)
   (:import-from #:priq
-   #:prio-mailbox
-   #:make-prio-mailbox
-   #:mailbox-read
-   #:mailbox-peek
-   #:mailbox-send
-   #:mailbox-empty-p
+   ;; #:prio-mailbox
+   ;; #:make-prio-mailbox
+   ;; #:mailbox-read
+   ;; #:mailbox-peek
+   ;; #:mailbox-send
+   ;; #:mailbox-empty-p
    #:make-unsafe-fifo
+   #:priq
+   #:fifo
+   #:unsafe-fifo
    #:make-priq
    #:make-fifo
+   #:make-unsafe-fifo
    #:addq
    #:popq
    #:emptyq-p
-   #:contents)
+   #:contents
+   #:locked-exec)
   (:import-from #:trivia
    #:match
    #:ematch
@@ -81,6 +101,7 @@ THE SOFTWARE.
    #:recover-ans-or-exn
    #:<shared-plist>
    #:get-kv
+   #:set-kvs
    #:symb)
 
   #+:LISPWORKS
@@ -100,12 +121,11 @@ THE SOFTWARE.
    #:send
    #:invalid-send-target
    #:ask
-   #:aska
    #:current-actor
+   #:asking-p
    #:spawn
    #:get-property
    #:set-property
-   #:suspend
    #:become
    #:dispatch-message
    #:self-call
@@ -116,35 +136,20 @@ THE SOFTWARE.
    #:get-actors
    #:recv
    #:retry-recv
-   #:=cont
    #:terminate-actor
-   #:without-actor-status
-   #:make-proxy
 
-   #:=lambda
-   #:=defun
-   #:=bind
-   #:=bind-callback
-   #:=values
-   #:=funcall
-   #:=apply
-   #:with-cont
-   #:with-future
-   #:smapcar
-   #:smapc
-   #:pmapcar
-   #:pmapc
+   #:timeout
+   #:*timeout*
+   #:with-timeout
+   #:exec-with-timeout
+   #:read-mbox-with-timeout
+   
    #:par
-   #:with-futures
-   #:pfirst
-   #:par-first
-   #:with-first-future
-
+   #:pmapcar
+   #:parlet
+   
    #:set-executive-pool
-   #:with-borrowed-mailbox
    #:do-nothing
-
-   #:install-actor-system
 
    #:default-watchdog-function
    #:*watchdog-hook*
@@ -156,52 +161,35 @@ THE SOFTWARE.
 
    #:schedule-timeout-action
    #:schedule-after
-   ))
 
-(defpackage #:linda
-  (:use #:common-lisp #:ac)
-  (:import-from #:um
-   #:if-let
-   #:when-let
-   #:foreach
-   #:nlet
-   #:nlet-tail
-   #:group
-   #:dlambda
-   #:curry
-   #:rcurry
-   #:defmacro!
-   #:accum)
-  (:export
-   #:*linda*
-   #:make-ts
-   #:out
-   #:rd
-   #:in
-   #:rdp
-   #:inp
-   #:outb
-   #:rdb
-   #:rdbp
-   #:remove-bindings
-   #:on-in
-   #:on-inp
-   #:on-rd
-   #:on-rdp
-   #:on-rdb
-   #:on-rdbp
-   #:remove-all-bindings
-   #:remove-all-tuples
-   #:reset
-   #:srdp
-   #:sinp
-   #:srdbp
-   #:remove-tuples
-   #:remote-srdp
-   #:remote-sinp
-   #:remote-out
-   #:remote-outb
-   #:remote-srdbp
-   #:remote-remove-bindings
+   #:worker
+   #:spawn-worker
+   #:actor-as-worker
+   #:spawn-actor-as-worker
+
+   #:with-future
+   :=lambda
+   :=defun
+   :=defmethod
+   :=flet
+   :=labels
+   :=values
+   :=funcall
+   :=apply
+   :=bind
+   :=bind-cont
+   :with-cont
+
+   :process
+   :make-process
+   :spawn-link
+   :spawn-monitor
+   :link-between
+   :unlink-between
+   :link
+   :unlink
+   :dispatch-message
+   :exit
+   :trap-exits
    ))
 

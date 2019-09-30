@@ -172,8 +172,9 @@ THE SOFTWARE.
   (let ((len (length str)))
     (if (< len 17)
         str
-      (format nil "~A..~A"
+      (concatenate 'string
               (subseq str 0 7)
+              ".."
               (subseq str (- len 7)))
       )))
 
@@ -482,7 +483,9 @@ THE SOFTWARE.
   (declare (integer val))
   (let ((nc  (* 2 (length vec))))
     (declare (fixnum nc))
-    (format nil "~@?" (format nil "~~~A,'0x" nc) val)))
+    (with-standard-io-syntax ;; cancel bignum abbrev
+      (format nil "~@?" (format nil "~~~D,'0x" nc) val)
+      )))
 
 (defmethod hex ((x bev))
   (make-instance 'hex

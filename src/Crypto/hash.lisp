@@ -28,9 +28,10 @@ THE SOFTWARE.
 
 ;; -------------------------------------------------
 
-(defclass hash (ub8v-repr)
-  ((val :reader  hash-val
-        :initarg :val)))
+(defclass hash (bev)
+  ((val :reader hash-val
+        :reader hash-bytes
+        :initarg :vec)))
 
 (defclass hash/ripemd/160 (hash)
   ())
@@ -53,12 +54,6 @@ THE SOFTWARE.
 
 ;; -------------------------------------------------
 
-(defmethod ub8v-repr ((x hash))
-  (hash-val x))
-
-(defmethod hash-bytes ((x hash))
-  (bev-vec (hash-val x)))
-
 (defmethod hash-length ((x hash))
   (length (hash-bytes x)))
 
@@ -66,10 +61,8 @@ THE SOFTWARE.
 ;; what to hash of various types
 
 (defgeneric hashable (x)
-  (:method ((x ub8v))
-   (bev-vec (bev x)))
-  (:method ((x ub8v-repr))
-   (hashable (ub8v-repr x)))
+  (:method ((x ub8v-obj))
+   (bev-vec x))
   (:method ((x integer))
    (hashable (bev x)))
   (:method ((x sequence))
@@ -93,8 +86,7 @@ THE SOFTWARE.
       (ironclad:update-digest dig (hashable arg)))
     (let ((hv  (ironclad:produce-digest dig)))
       (values (make-instance dig-class
-                             :val (make-instance 'bev
-                                                 :vec hv))
+                             :vec hv)
               (length hv)))))
 
 (defun hash/ripemd/160 (&rest args)
@@ -124,33 +116,49 @@ THE SOFTWARE.
 (defun make-bare-hash (vec fn)
   (values
    (make-instance 'hash/var
-                  :val (make-instance 'bev
-                                      :vec vec)
+                  :vec    vec
                   :hashfn fn)
    (length vec)))
 
 (defun get-hash-nbytes (nb &rest seeds)
-  (make-bare-hash (apply 'get-raw-hash-nbytes nb seeds)
-                  (get-cached-symbol-data 'hash/var :hash-bytes-fn nb
-                                          (lambda ()
-                                            (um:curry 'get-hash-nbytes nb)))
-                  ))
+  (declare (fixnum nb))
+  (check-type nb (integer 0))
+  (apply (get-cached-symbol-data
+          'hash/var 'get-hash-nbytes nb
+          (lambda ()
+            (labels ((hash-fn (&rest args)
+                       (make-bare-hash
+                        (apply 'get-raw-hash-nbytes nb args)
+                        #'hash-fn)))
+              #'hash-fn)))
+         seeds))
 
-(defun get-raw-hash-nbits (nbits &rest seeds)
-  "Concatenated SHA3 until we collect enough bits"
-  (multiple-value-bind (nbw nbf) (ceiling nbits 8)
-    (let ((vec (apply 'get-raw-hash-nbytes nbw seeds)))
-      (setf (aref vec 0) (ldb (byte (+ 8 nbf) 0) (aref vec 0)))
-      vec)))
+(defun hash-to-range (range &rest seeds)
+  ;; This function is useful for hashing onto an Elliptic curve
+  ;; by considering the hash value to be an X coord.
+  ;; No need here to restrict range to (Sqrt[base], base - Sart[base])
+  ;; as we do for safe-random values, because of difficulty of ECDLP.
+  (declare (integer range))
+  (check-type range (integer 2))
+  (apply (get-cached-symbol-data
+          'hash/var 'hash-to-range range
+          (lambda ()
+            (let ((nbytes  (ceiling (integer-length range) 8)))
+              (labels ((hash-fn (&rest args)
+                         (let* ((vec (apply 'get-raw-hash-nbytes nbytes args))
+                                (val (int vec)))
+                           (unless (< val range)
+                             (um:while (>= val range)
+                               (setf val (ash val -1)))
+                             (setf vec (convert-int-to-vec val)))
+                           (make-bare-hash vec #'hash-fn))))
+                #'hash-fn))))
+         seeds))
 
 (defun get-hash-nbits (nbits &rest seeds)
-  (make-bare-hash (apply 'get-raw-hash-nbits nbits seeds)
-                  (get-cached-symbol-data 'hash/var :hash-bits-fn nbits
-                                          (lambda ()
-                                            (um:curry 'get-hash-nbits nbits)))))
-
-(defun hash-to-range (range &rest args)
-  (apply 'get-hash-nbits (um:floor-log2 range) args))
+  (declare (fixnum nbits))
+  (check-type nbits (integer 1))
+  (apply 'hash-to-range (ash 1 nbits) seeds))
 
 ;; -----------------------------------------------------
 
@@ -159,14 +167,6 @@ THE SOFTWARE.
 
 (defmethod hash= ((hash1 hash) (hash2 hash))
   (vec= hash1 hash2))
-
-;; -----------------------------------------------------
-
-(defmethod print-object ((obj hash) out-stream)
-  (if *print-readably*
-      (call-next-method)
-    (print-unreadable-object (obj out-stream :type t)
-      (princ (short-str (hex-str obj)) out-stream))))
 
 ;; -----------------------------------------------------
 

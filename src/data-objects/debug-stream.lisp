@@ -83,12 +83,14 @@ THE SOFTWARE.
                                         
                                                            
 (defmethod debug-print ((intf <dbg-stream>) obj)
-  (let ((*print-length* nil)
-        (stream (output-stream-of intf)))
-    (capi:display intf)
-    (princ obj stream)
-    (terpri stream)
-    (force-output stream)))
+  (capi:execute-with-interface intf
+                               (lambda ()
+                                 (let ((*print-length* nil)
+                                       (stream (output-stream-of intf)))
+                                   (capi:display intf)
+                                   (princ obj stream)
+                                   (terpri stream)
+                                   (force-output stream)))))
 
 ;; -------------------------------------
 

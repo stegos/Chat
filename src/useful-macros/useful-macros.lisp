@@ -821,7 +821,7 @@ THE SOFTWARE.
     (values (nreverse haves)
             (nreverse have-nots))))
 
-(defmethod group ((lst list) n)
+(defmethod group ((lst list) n &key from-end)
   (check-type n (integer 1))
   (labels ((rec (source acc)
              (let ((rest (nthcdr n source)))
@@ -829,9 +829,22 @@ THE SOFTWARE.
                    (rec rest (cons (subseq source 0 n) acc))
                  (nreverse (cons source acc))))))
     (when lst
-      (rec lst nil))))
+      (cond (from-end
+             (let* ((nel   (length lst))
+                    (start (mod nel n)))
+               (cond
+                ((< nel n)     lst)
+                ((zerop start) (rec lst nil))
+                (t 
+                 (cons (subseq lst 0 start)
+                       (rec (nthcdr start lst) nil)))
+                )))
+
+            (t
+             (rec lst nil))
+            ))))
       
-(defmethod group ((seq sequence) n)
+(defmethod group ((seq sequence) n &key from-end)
   (check-type n (integer 1))
   (let ((stop (length seq)))
     (labels ((rec (start end acc)
@@ -840,7 +853,18 @@ THE SOFTWARE.
                  (rec end (+ end n) (cons (subseq seq start end) acc))
                  )))
     (when (plusp stop)
-      (rec 0 n nil)))))
+      (cond (from-end
+             (let ((start (mod stop n)))
+               (if (or (zerop start)
+                       (< stop n))
+                   (rec 0 n nil)
+                 (cons (subseq seq 0 start)
+                       (rec start (+ start n) nil))
+                 )))
+
+            (t 
+             (rec 0 n nil))
+            )))))
 
 (defmacro tuples (nel &rest args)
   `(list ,@(mapcar #`(list ,@a1) (group args nel))))
@@ -1985,11 +2009,10 @@ This is C++ style enumerations."
                 (compose tst #'val-of)
                 #'1+)))
     
-    (cond ((zerop by)
-           (and (= from to) (list from)))
-          ((and (>= to from) (plusp by))
+    (cond ((and (> to from) (plusp by))
            (iota (rcurry #'>= #|ix|# to)))
           ((and (< to from) (minusp by))
+           (decf from)
            (iota (rcurry #'< #|ix|# to)))
           (t nil))))
 
@@ -2910,7 +2933,8 @@ or list acceptable to the reader macros #+ and #-."
   (make-capture-packet
    :data (multiple-value-list
           (ignore-errors
-            (multiple-value-list (apply fn args))))
+            (multiple-value-list
+             (apply fn args))))
    ))
 
 (defmethod recover-ans-or-exn ((capt capture-packet))
@@ -2919,6 +2943,9 @@ or list acceptable to the reader macros #+ and #-."
     (if exn
         (error exn)
       (values-list ans))))
+
+(defmethod recover-ans-or-exn (ans)
+  ans)
 
 ;; ----------------------------------------------
 ;; these need to be adapted to Allegro SMP
@@ -3031,3 +3058,42 @@ or list acceptable to the reader macros #+ and #-."
   (declare (ignore a))
   b)
 
+;; --------------------------------------------------------------------------------
+
+(defmacro gathering (&body body)
+  "Run `body` to gather some things and return a fresh list of them.
+
+  `body` will be executed with the symbol `gather` bound to a
+  function of one argument.  Once `body` has finished, a list of
+  everything `gather` was called on will be returned.
+
+  It's handy for pulling results out of code that executes
+  procedurally and doesn't return anything, like `maphash` or
+  Alexandria's `map-permutations`.
+
+  The `gather` function can be passed to other functions, but should
+  not be retained once the `gathering` form has returned (it would
+  be useless to do so anyway).
+
+  Examples:
+
+    (gathering
+      (dotimes (i 5)
+        (gather i))
+    =>
+    (0 1 2 3 4)
+
+    (gathering
+      (mapc #'gather '(1 2 3))
+      (mapc #'gather '(a b)))
+    =>
+    (1 2 3 a b)
+
+  "
+  (let ((result (gensym)))
+    `(let ((,result nil))
+       (flet ((gather (item)
+                (push item ,result)
+                item))
+         ,@body)
+       (nreverse ,result))))

@@ -122,3 +122,106 @@ THE SOFTWARE.
  (print x))
  |#
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun bblet-handler (symbol)
+    (get symbol 'bblet-handler)))
+
+(defmacro define-bblet-handler ((symbol clauses-args clause) &body body)
+  `(setf (get ,symbol 'bblet-handler)
+         (lambda (,clauses-args ,clause)
+           ,@body)))
+
+(defmacro bblet (bindings &body body)
+  (cond (bindings
+         `(bblet-expand ,(car bindings)
+                       (bblet ,(cdr bindings) ,@body)))
+        (t
+         `(progn ,@body))
+        ))
+
+(defmacro bblet-expand (binding clause)
+  (cond
+   ((consp binding)
+    (let ((hd (car binding)))
+      (cond
+       ((keywordp hd)
+        (let ((fn (bblet-handler hd)))
+          (if fn
+              (funcall fn binding clause)
+            (error "Invalid BBLET type ~S" hd))))
+
+       ((eql 'declare hd)
+        `(locally ,binding ,clause))
+       
+       ((symbolp hd)
+        `(let* (,binding)
+           ,clause))
+       
+       ((and (consp hd)
+             (symbolp (car hd))
+             (not (keywordp (car hd))))
+        (destructuring-bind ((sym typ) &rest val) binding
+          `(let* ((,sym ,@val))
+             (declare (type ,typ ,sym))
+             ,clause)))
+       
+       (t
+        (error "Invalid BBLET syntax"))
+       )))
+   
+   ((null binding)
+    clause)
+   
+   (t
+    (error "Invalid BBLET binding ~S" binding))
+   ))
+
+;; ---------------------------------------------------------
+
+(define-bblet-handler (:db args clause)
+  (destructuring-bind (kw pat form) args
+    (declare (ignore kw))
+    `(destructuring-bind ,pat ,form
+       ,clause)))
+
+(define-bblet-handler (:mv args clause)
+  (destructuring-bind (kw pat form) args
+    (declare (ignore kw))
+    `(multiple-value-bind ,pat ,form
+       ,clause)))
+
+(define-bblet-handler (:ac args clause)
+  (destructuring-bind (kw pat form) args
+    (declare (ignore kw))
+    `(with-accessors ,pat ,form
+       ,clause)))
+
+(define-bblet-handler (:sl args clause)
+  (destructuring-bind (kw pat form) args
+    (declare (ignore kw))
+    `(with-slots ,pat ,form
+       ,clause)))
+
+(define-bblet-handler (:fn args clause)
+  (destructuring-bind (kw fndefs) args
+    (declare (ignore kw))
+    `(flet ,fndefs
+       ,clause)))
+    
+(define-bblet-handler (:rfn args clause)
+  (destructuring-bind (kw fndefs) args
+    (declare (ignore kw))
+    `(labels ,fndefs
+       ,clause)))
+
+#+:LISPWORKS
+(editor:setup-indent "bblet" 2)
+
+#|
+(bblet (((x integer) 15)
+        (declare ((x double-float)))
+        (:ac ((lock thing-lock)
+              (val  thing-val)) it))
+    (print x))
+ |#
+

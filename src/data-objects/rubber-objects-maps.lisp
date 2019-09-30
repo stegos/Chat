@@ -127,7 +127,7 @@ THE SOFTWARE.
   (let ((obj    (gensym (string :obj-)))
         (val    (gensym (string :val-)))
         (reader (symb (or accessor-name key)))
-        (writer (symb (gensym (string :set-)))))
+        (writer (symb :set- (or accessor-name key))))
     `(progn
        ;; by creating methods here, we allow for the possibility
        ;; that the user could define the same accessors on other types.

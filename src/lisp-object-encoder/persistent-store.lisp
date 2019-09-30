@@ -31,22 +31,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 |#
 
-(defpackage #:persistent-store
-  (:use #:common-lisp)
-  (:nicknames #:persist)
-  (:export
-   #:make-persistent-store
-   #:retrieve
-   #:retrieve-store
-   #:persist
-   #:persist-in-store
-   #:mark-dirty
-   #:unpersist
-   #:commit
-   #:commit-store
-   #:revert
-   ))
-
 ;; ------------------------------------------
 (in-package :persistent-store)
 ;; ------------------------------------------

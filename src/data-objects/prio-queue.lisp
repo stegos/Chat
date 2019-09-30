@@ -59,7 +59,8 @@ THE SOFTWARE.
 
 (defmethod rmw ((e envelope) modify-fn)
   (declare (function modify-fn))
-  (setf (envelope-ref e) (funcall modify-fn (envelope-ref e))))
+  (mp:with-interrupts-blocked
+    (setf (envelope-ref e) (funcall modify-fn (envelope-ref e)))))
 
 (defmethod exch ((e envelope) val)
   (shiftf (envelope-ref e) val))
@@ -77,7 +78,11 @@ THE SOFTWARE.
 (defmethod countq :around ((s safe-mixin))
   (mpcompat:with-lock ((safe-mixin-lock s))
     (call-next-method)))
-          
+
+(defmethod locked-exec ((s safe-mixin) fn)
+  (mpcompat:with-lock ((safe-mixin-lock s))
+    (funcall fn)))
+
 ;; --------------------------------------------------------------
 ;; UNSAFE-LIFO - A LIFO queue - unsafe for sharing
 
@@ -191,11 +196,13 @@ THE SOFTWARE.
    (tl  :accessor unsafe-fifo-tl
         :initarg  :tl)))
 
-(defun make-unsafe-fifo ()
+(defmethod initialize-instance :after ((fifo unsafe-fifo) &key &allow-other-keys)
   (let ((empty (list nil)))
-    (make-instance 'unsafe-fifo
-                   :hd empty
-                   :tl empty)))
+    (setf (unsafe-fifo-hd fifo) empty
+          (unsafe-fifo-tl fifo) empty)))
+  
+(defun make-unsafe-fifo ()
+  (make-instance 'unsafe-fifo))
 
 (defun copy-unsafe-fifo (f)
   (make-instance 'unsafe-fifo
@@ -205,7 +212,8 @@ THE SOFTWARE.
 (defmethod addq ((q unsafe-fifo) item &key &allow-other-keys)
   (with-accessors ((tl  unsafe-fifo-tl)) q
     (declare (cons tl))
-    (setf tl (setf (cdr tl) (list item)))
+    (mp:with-interrupts-blocked
+      (setf tl (setf (cdr tl) (list item))))
     ))
 
 (defmethod popq ((q unsafe-fifo) &key &allow-other-keys)
@@ -236,14 +244,16 @@ THE SOFTWARE.
   (with-accessors ((hd  unsafe-fifo-hd)
                    (tl  unsafe-fifo-tl)) q
     (declare (cons hd tl))
-    (shiftf (cdr (setf tl hd)) nil)))
+    (mp:with-interrupts-blocked
+      (shiftf (cdr (setf tl hd)) nil))))
 
 (defmethod set-contents ((q unsafe-fifo) lst)
   (with-accessors ((hd  unsafe-fifo-hd)
                    (tl  unsafe-fifo-tl)) q
     (declare (cons hd tl))
-    (setf (cdr hd) lst
-          tl       (last hd)) ))
+    (mp:with-interrupts-blocked
+      (setf (cdr hd) lst
+            tl       (last hd)) )))
 
 (defsetf contents set-contents)
 
@@ -311,9 +321,10 @@ THE SOFTWARE.
   (null (car (fifo-ref q))))
 
 (defmethod contents ((q fifo))
-  (destructuring-bind (hd . tl) (exch q (cons nil nil))
-    (nconc hd (nreverse tl))))
-
+  (mp:with-interrupts-blocked
+    (destructuring-bind (hd . tl) (exch q (cons nil nil))
+      (nconc hd (nreverse tl)))))
+  
 (defmethod findq ((q fifo) val &rest args)
   (mpcompat:with-lock ((safe-mixin-lock q))
     (destructuring-bind (hd . tl) (fifo-ref q)
@@ -334,10 +345,11 @@ THE SOFTWARE.
 (defmethod addq ((q unsafe-priq) item &key prio)
   (let* ((tree (envelope-ref q))
          (fq   (maps:find prio tree)))
-    (unless fq
-      (setf fq (make-unsafe-fifo)
-            (envelope-ref q) (maps:add prio fq tree)))
-    (addq fq item)))
+    (mp:with-interrupts-blocked
+      (unless fq
+        (setf fq (make-unsafe-fifo)
+              (envelope-ref q) (maps:add prio fq tree)))
+      (addq fq item))))
 
 (defmethod popq ((q unsafe-priq) &key prio)
   (let ((tree  (envelope-ref q)))
@@ -345,10 +357,11 @@ THE SOFTWARE.
                (values nil nil))
 
              (yes (prio fq)
-               (let ((ans (popq fq)))
-                 (when (emptyq-p fq)
-                   (setf (envelope-ref q) (maps:remove prio tree)))
-                 (values ans t))))
+               (mp:with-interrupts-blocked
+                 (let ((ans (popq fq)))
+                   (when (emptyq-p fq)
+                     (setf (envelope-ref q) (maps:remove prio tree)))
+                   (values ans t)))))
       
       (cond ((maps:is-empty tree) (no))
             
@@ -457,150 +470,3 @@ THE SOFTWARE.
                      )) ))
     (values ans found)))
 
-;; ------------------------------------------------------
-;; PRIO-MAILBOX -- Mailbox with priority delivery - safe for sharing
-
-#+:LISPWORKS
-(progn
-  (defclass prio-mailbox (priq)
-    ((sem  :reader   prio-mailbox-sem
-           :initarg  :sem
-           :initform (mp:make-semaphore :count 0))))
-  
-  (defun make-prio-mailbox (&key name)
-    (if name
-        (make-instance 'prio-mailbox
-                       :sem (mp:make-semaphore :count 0
-                                               :name  name))
-      ;; else
-      (make-instance 'prio-mailbox)))
-  
-  (defmethod mailbox-send ((mbox prio-mailbox) msg &key (prio 0))
-    (with-accessors ((sem  prio-mailbox-sem)) mbox
-      (addq mbox msg :prio prio)
-      (mp:semaphore-release sem)))
-  
-  (defmethod mailbox-empty-p ((mbox prio-mailbox))
-    (emptyq-p mbox))
-  
-  (defmethod mailbox-not-empty-p ((mbox prio-mailbox))
-    (not (mailbox-empty-p mbox)))
-
-  (defmethod mailbox-read ((mbox prio-mailbox) &optional wait-reason timeout)
-    (with-accessors ((sem  prio-mailbox-sem)) mbox
-      (and (mp:semaphore-acquire sem
-                                 :wait-reason wait-reason
-                                 :timeout     timeout)
-           (popq mbox))
-      ))
-
-  (defmethod mailbox-peek ((mbox prio-mailbox))
-    (peekq mbox)))
-
-;; ------------------------------------------------------
-
-#+:CLOZURE
-(progn
-  (defclass prio-mailbox (priq)
-    ((sem  :reader   prio-mailbox-sem
-           :initform (mp:make-semaphore))))
-  
-  (defun make-prio-mailbox (&key name)
-    (make-instance 'prio-mailbox))
-  
-  (defmethod mailbox-send ((mbox prio-mailbox) msg &key (prio 0))
-    (with-accessors ((sem  prio-mailbox-sem)) mbox
-      (addq mbox msg :prio prio)
-      (mp:signal-semaphore sem)))
-  
-  (defmethod mailbox-empty-p ((mbox prio-mailbox))
-    (emptyq-p mbox))
-  
-  (defmethod mailbox-not-empty-p ((mbox prio-mailbox))
-    (not (mailbox-empty-p mbox)))
-  
-  (defmethod mailbox-read ((mbox prio-mailbox) &optional wait-reason timeout)
-    (with-accessors ((sem prio-mailbox-sem)) mbox
-      (ccl:with-interrupts-enabled
-          (if timeout
-              (and (mp:timed-wait-on-semaphore sem timeout)
-                   (popq mbox))
-              (progn
-                (mp:wait-on-semaphore sem nil wait-reason)
-                (popq mbox))))))
-
-  (defmethod mailbox-peek ((mbox prio-mailbox))
-    (peekq mbox)))
-
-#+:SBCL
-(progn
-  (defclass prio-mailbox (priq)
-    ((sem  :reader   prio-mailbox-sem
-           :initform (sb-thread:make-semaphore))))
-  
-  (defun make-prio-mailbox (&key name)
-    (make-instance 'prio-mailbox))
-  
-  (defmethod mailbox-send ((mbox prio-mailbox) msg &key (prio 0))
-    (with-accessors ((sem  prio-mailbox-sem)) mbox
-      (addq mbox msg :prio prio)
-      (sb-thread:signal-semaphore sem)))
-  
-  (defmethod mailbox-empty-p ((mbox prio-mailbox))
-    (emptyq-p mbox))
-  
-  (defmethod mailbox-not-empty-p ((mbox prio-mailbox))
-    (not (mailbox-empty-p mbox)))
-  
-  (defmethod mailbox-read ((mbox prio-mailbox) &optional wait-reason timeout)
-    (declare (ignore wait-reason))
-    (with-accessors ((sem prio-mailbox-sem)) mbox
-      (if timeout
-          (and (sb-thread:wait-on-semaphore sem :timeout timeout)
-               (popq mbox))
-          (progn
-            (sb-thread:wait-on-semaphore sem)
-            (popq mbox)))))
-  
-  (defmethod mailbox-peek ((mbox prio-mailbox))
-    (peekq mbox)))
-
-;; ------------------------------------------------------
-
-#+:ALLEGRO
-(progn
-  (defclass prio-mailbox (priq)
-    ((sem  :reader   prio-mailbox-sem
-           :initform (mp:make-gate nil))))
-
-  (defun make-prio-mailbox (&key name)
-    (make-instance 'prio-mailbox))
-  
-  (defmethod mailbox-send ((mbox prio-mailbox) msg &key (prio 0))
-    (with-accessors ((sem  prio-mailbox-sem)) mbox
-      (addq mbox msg :prio prio)
-      (mp:put-semaphore sem)))
-  
-  (defmethod mailbox-empty-p ((mbox prio-mailbox))
-    (emptyq-p mbox))
-  
-  (defmethod mailbox-not-empty-p ((mbox prio-mailbox))
-    (not (mailbox-empty-p mbox)))
-  
-  (defmethod mailbox-read ((mbox prio-mailbox) &optional wait-reason timeout)
-    (with-accessors ((sem   prio-mailbox-sem)) mbox
-      (cond ((null timeout)
-             (mp:get-semaphore sem)
-             (popq mbox))
-            
-            ((plusp timeout)
-             (sys:with-timeout ((max timeout 0.1)
-                                (values nil nil))
-                (mp:get-semaphore sem)
-                (popq mbox)))
-            )))
-  
-  (defmethod mailbox-peek ((mbox prio-mailbox))
-    (peekq mbox)))
-
-;; ------------------------------------------------------

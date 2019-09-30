@@ -171,6 +171,20 @@ THE SOFTWARE.
 ;; -----------------------------------------------------------
 ;; add - insertion of one element
 
+(defvar *replace-p* nil)
+
+(defmacro with-replacement (&body body)
+  `(let ((*replace-p* t))
+     ,@body))
+
+(defmacro without-replacement (&body body)
+  `(let ((*replace-p* nil))
+     ,@body))
+
+(defmacro with-replacement-p (tf &body body)
+  `(let ((*replace-p* ,tf))
+     ,@body))
+
 (defmethod add (x (tree empty))
   (values (singleton x) t))
 
@@ -184,8 +198,10 @@ THE SOFTWARE.
                       ;; in zero case - to support maps (see below)
                       ;; ensure that new map value is substituted for old
                       ;; value - use x instead of v for value field of result.
-                      (make-instance 'node
-                       :l l :v x :r r :h h))
+                      (if *replace-p*
+                          (make-instance 'node
+                                         :l l :v x :r r :h h)
+                        tree))
                       
                       ((minusp c)
                        (multiple-value-bind (new-left needs-rebal) (add x l)
@@ -673,10 +689,16 @@ THE SOFTWARE.
 
 (defmethod print-node ((tree node) keyfn)
   (with-node-bindings (_ v) tree
-    (format nil "~D" (funcall keyfn v))))
+    (with-standard-io-syntax
+      (with-output-to-string (s)
+        (princ (funcall keyfn v) s)
+        ))))
+
+(defmethod key-fn (item)
+  item)
 
 #+:LISPWORKS
-(defmethod view-set ((s tree) &key (key #'identity) (layout :left-right))
+(defmethod view-set ((s tree) &key (key #'key-fn) (layout :left-right))
   (capi:contain
    (make-instance 'capi:graph-pane
                   :layout-function layout
@@ -686,6 +708,9 @@ THE SOFTWARE.
                                          (set-children node layout))
                   :print-function    #'(lambda (node)
                                          (print-node node key))
+                  :action-callback (lambda (item intf)
+                                     (declare (ignore intf))
+                                     (inspect item))
                   )))
 
 #|

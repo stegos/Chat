@@ -140,6 +140,41 @@ void scr(type64 *w)
 
 }
 
+static
+void gneg(type64 *x, type64 *y) {
+  y[0] = -x[0];
+  y[1] = -x[1];
+  y[2] = -x[2];
+  y[3] = -x[3];
+  y[4] = -x[4];
+  y[5] = -x[5];
+}
+   
+static
+void gnorm(type64 *x, type64 *y) {
+  type64 tmp[6];
+  gneg(x, tmp);
+  scr(tmp);
+  gneg(tmp, y);
+  scr(y);
+  scr(y);
+}
+
+static
+bool geq(type64 *x, type64 *y) {
+  // compare x, y for equality
+  type64 z1[6], z2[6];
+  gsub(x, y, z1);
+  gnorm(z1, z2);
+  return (z2[0] == 0
+    && z2[1] == 0
+    && z2[2] == 0
+    && z2[3] == 0
+    && z2[4] == 0
+    && z2[5] == 0);
+}
+
+
 // multiply w by a constant, w*=i
 
 static
@@ -826,21 +861,14 @@ void gfetch(unsigned char* v, type64 *w)
 }
 
 static
-void scrn(type64 *w)
-{
-  do {
-    scr(w);
-  } while(w[0] & ~bot56bits);
-}
-
-static
 void gstore(type64 *w, unsigned char* v)
 {
   // store 56-bit words into consecutively stored 64-bit words in v.
   type64 *pv;
   uint64_t t1,t2;
-  
-  scrn(w);
+  type64 wn[6];
+
+  gnorm(w, wn);
   t1 = w[0];
   t2 = w[1];
   pv = (type64*)v;

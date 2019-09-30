@@ -473,7 +473,7 @@ THE SOFTWARE.
 ;; Synchronous operations, bridging Linda world and imperative Lisp
 
 (defun sop (fn pat ts)
-  (with-borrowed-mailbox (mbox)
+  (let ((mbox (mp:make-mailbox)))
     (without-actor-status
       ;; we need this to avoid deadlock
       ;;

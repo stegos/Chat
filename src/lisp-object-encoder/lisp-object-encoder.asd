@@ -35,8 +35,10 @@ THE SOFTWARE.
   :version     "1.0"
   :author      "D.McClain <dbm@spectrodynamics.com>"
   :license     "Copyright (c) 2008 by SpectroDynamics, LLC. All rights reserved."
-  :components  ((:file "managed-buffers")
+  :components  ((:file "packages")
+                (:file "managed-buffers")
 		(:file "ubyte-streams")
+                (:file "lzw")
                 (:file "lisp-object-encoder")
                 #+(AND :COM.RAL :LISPWORKS) (:file "persistent-store")
 		#+(AND :COM.RAL :LISPWORKS) (:file "prevalent-metaclass")
@@ -46,5 +48,6 @@ THE SOFTWARE.
   :SERIAL T
   :depends-on   ("data-objects"
                  "ironclad"
-                 "sdle-store"))
+                 "sdle-store"
+                 "babel"))
 

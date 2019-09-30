@@ -129,11 +129,10 @@ THE SOFTWARE.
       (parse-recv-clauses clauses)
     `(labels
          ((retry-recv ()
-            (self-call
+            (dispatch-message
              :recv-setup-{204E1756-D84E-11E7-9D93-985AEBDA9C2A}
              ,conds-fn ,timeout-fn ,timeout-expr)))
        (retry-recv))
     ))
 
 ;; ----------------------------------------------------------------------------------
-

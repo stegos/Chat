@@ -81,6 +81,8 @@ THE SOFTWARE.
                       (AND :MACOSX :ALLEGRO)) (:file "OSX-UUID-Generate")
                 ;; (:file "xfli")
 		;; (:file "rubber-objects")
+                (:file "abbrev-bignums")
+                (:file "sep")
                 )
   :serial       t
   :depends-on   (#| "compiled-ml-matcher" |#

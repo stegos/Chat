@@ -52,8 +52,8 @@ happen."
 (defmethod public-of-secret ((secret-key secret-key))
   "PUBLIC-OF-SECRET returns the public key corresponding to a secret-key."
   (make-instance 'public-key
-                 :val (mul-pt-zr (get-g2)
-                                 (int secret-key))))
+                 :val (bev-vec (mul-pt-zr (get-g2)
+                                          (int secret-key)))))
 
 (defun check-zero (n)
   "Check for n = 0, and abort if so."
@@ -69,7 +69,7 @@ happen."
                             (check-zero (int (bev (subseq bytes 0 32))))))
          (sumpt  (add-pts parent-pkey subpt))
          (cpkey  (make-instance 'public-key
-                                :val (bev sumpt)))
+                                :val (bev-vec sumpt)))
          (cchain (bev (subseq bytes 32))))
     (values cpkey cchain)))
   
@@ -84,8 +84,9 @@ parent-chain and index for same parent keying."
                  (public-of-secret parent-skey)))
          (bytes  (bev-vec (hash/512 parent-chain data ix)))
          (cskey  (make-instance 'secret-key
-                                :val (add-zrs (int parent-skey)
-                                              (check-zero (int (bev (subseq bytes 0 32)))))))
+                                :val (bev-vec
+                                      (add-zrs (int parent-skey)
+                                               (check-zero (int (bev (subseq bytes 0 32))))))))
          (cchain (bev (subseq bytes 32))))
     (values cskey cchain)))
 
